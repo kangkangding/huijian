@@ -1,0 +1,5 @@
+SUPABASE_URL=https://YOUR_PROJECT.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
+PAYMENT_WEBHOOK_SECRET=change-me
+APP_ORIGIN=http://localhost:5173
+APP_ENV=development

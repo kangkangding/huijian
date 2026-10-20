@@ -1,0 +1,16 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "huijian-api",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-10-21",
+  "observability": {
+    "enabled": true,
+    "traces": {
+      "enabled": true
+    }
+  },
+  "vars": {
+    "APP_ENV": "production",
+    "APP_ORIGIN": "http://localhost:5173"
+  }
+}
