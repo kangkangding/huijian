@@ -11,6 +11,7 @@
   },
   "vars": {
     "APP_ENV": "production",
-    "APP_ORIGIN": "https://huijian.851615943.workers.dev"
+    "APP_ORIGIN": "https://huijian.851615943.workers.dev",
+    "SUPABASE_URL": "https://zlhyaycmqeljtnznhnqj.supabase.co"
   }
 }
