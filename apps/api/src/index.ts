@@ -365,9 +365,7 @@ app.get("/api/videos/:id", async (c) => {
 app.get("/api/admin/provider-key", async (c) => {
   const profile = await requireUser(c);
   if (profile.role !== "admin") throw new HttpError(403, "需要管理员", "admin");
-  const db = createDb(c.env);
-  const rows = await db.get<{ api_key: string }>("provider_secrets?provider=eq.agnes&select=api_key");
-  const key = rows[0]?.api_key ?? "";
+  const key = await providerKey(c.env).catch(() => "");
   return c.json({ configured: Boolean(key), hint: key ? `····${key.slice(-4)}` : "" });
 });
 
@@ -423,6 +421,8 @@ async function loadPlans(env: Env): Promise<Plan[]> {
 }
 
 async function providerKey(env: Env): Promise<string> {
+  const fromCloudflare = env.AGNES_API_KEY?.trim() ?? "";
+  if (fromCloudflare.length >= 16) return fromCloudflare;
   const db = createDb(env);
   const rows = await db.get<{ api_key: string }>("provider_secrets?provider=eq.agnes&select=api_key");
   if (!rows[0]?.api_key) throw new HttpError(502, "还没有配置 Agnes 密钥", "key");

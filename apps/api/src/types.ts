@@ -4,6 +4,7 @@ export type Env = {
   APP_ORIGIN: string;
   APP_ENV: string;
   PAYMENT_WEBHOOK_SECRET: string;
+  AGNES_API_KEY?: string;
 };
 
 export type Role = "user" | "admin";
