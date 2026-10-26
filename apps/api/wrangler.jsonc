@@ -12,6 +12,8 @@
   "vars": {
     "APP_ENV": "production",
     "APP_ORIGIN": "https://huijian.851615943.workers.dev",
-    "SUPABASE_URL": "https://zlhyaycmqeljtnznhnqj.supabase.co"
+    "SUPABASE_URL": "https://zlhyaycmqeljtnznhnqj.supabase.co",
+    "BREVO_SENDER_EMAIL": "851615943@qq.com",
+    "BREVO_SENDER_NAME": "绘简"
   }
 }

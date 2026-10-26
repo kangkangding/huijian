@@ -5,6 +5,9 @@ export type Env = {
   APP_ENV: string;
   PAYMENT_WEBHOOK_SECRET: string;
   AGNES_API_KEY?: string;
+  BREVO_API_KEY?: string;
+  BREVO_SENDER_EMAIL?: string;
+  BREVO_SENDER_NAME?: string;
 };
 
 export type Role = "user" | "admin";

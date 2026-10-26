@@ -3,6 +3,7 @@ import { cors } from "hono/cors";
 import { createChat, createImage, createVideo, IMAGE_MODEL, pollVideo, UpstreamError, VIDEO_MODEL } from "./agnes";
 import { createDb } from "./db";
 import { HttpError, readJson, type Vars } from "./http";
+import { sendPasswordReset } from "./mail";
 import { hashPassword, randomToken, secretsMatch, sha256Hex, verifyPassword } from "./password";
 import {
   assertAccount,
@@ -102,10 +103,11 @@ app.post("/api/auth/forgot-password", async (c) => {
     const origin = c.env.APP_ORIGIN.replace(/\/$/, "");
     resetUrl = `${origin}/reset?token=${token}`;
     console.log(JSON.stringify({ event: "password.reset", userId: rows[0].id }));
+    if (c.env.APP_ENV !== "development") await sendPasswordReset(c.env, email, resetUrl);
   }
   return c.json({
     ok: true,
-    message: "如果这个邮箱已注册，可以用重置链接设置新密码。",
+    message: "如果这个邮箱已注册，重置邮件已经发出，30 分钟内有效。请查看收件箱和垃圾邮件。",
     resetUrl: c.env.APP_ENV === "development" ? resetUrl : undefined,
   });
 });
