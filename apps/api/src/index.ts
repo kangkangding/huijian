@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { createChat, createImage, createVideo, IMAGE_MODEL, pollVideo, UpstreamError, VIDEO_MODEL } from "./agnes";
-import { createDb } from "./db";
+import { createDb, DbError, isMissingSchema } from "./db";
 import { HttpError, readJson, type Vars } from "./http";
 import { sendPasswordReset, sendVerification } from "./mail";
 import { hashPassword, randomToken, secretsMatch, sha256Hex, verifyPassword } from "./password";
@@ -34,7 +34,7 @@ app.use("/api/*", async (c, next) => {
 });
 
 app.onError((error, c) => {
-  if (error instanceof HttpError) return c.json({ error: error.message, code: error.code }, error.status);
+  if (error instanceof HttpError) return c.json({ ...error.details, error: error.message, code: error.code }, error.status);
   if (error instanceof UpstreamError) {
     const status = error.status === 401 || error.status === 403 ? 502 : error.status === 402 ? 402 : error.status === 429 ? 429 : 502;
     return c.json({ error: error.message, code: "upstream" }, status);
@@ -101,9 +101,9 @@ app.post("/api/auth/forgot-password", async (c) => {
   const body = await readJson<{ email?: string }>(c);
   const email = (body.email ?? "").trim().toLowerCase();
   const db = createDb(c.env);
-  const rows = await db.get<Profile>(`profiles?email=eq.${encodeURIComponent(email)}&select=id`);
+  const rows = looksLikeEmail(email) ? await db.get<Profile>(`profiles?email=eq.${encodeURIComponent(email)}&select=id`) : [];
   let resetUrl: string | undefined;
-  if (rows[0]) {
+  if (rows[0] && !(await tooManyRecent(c.env, "password_resets", rows[0].id))) {
     const token = randomToken();
     const expires = new Date(Date.now() + 30 * 60 * 1000).toISOString();
     await db.post("password_resets", {
@@ -127,7 +127,7 @@ app.post("/api/auth/resend-verification", async (c) => {
   const body = await readJson<{ email?: string }>(c);
   const email = (body.email ?? "").trim().toLowerCase();
   const message = "如果这个邮箱已注册且尚未确认，验证邮件已经发出。";
-  if (await verificationReady(c.env)) {
+  if (looksLikeEmail(email) && await verificationReady(c.env)) {
     const db = createDb(c.env);
     const rows = await db.get<Profile>(`profiles?email=eq.${encodeURIComponent(email)}&select=*`);
     const profile = rows[0];
@@ -145,9 +145,9 @@ app.post("/api/auth/verify-email", async (c) => {
     `email_verifications?token_hash=eq.${await sha256Hex(token)}&select=id,user_id,expires_at,used_at`,
   );
   const verification = rows[0];
-  if (!verification || verification.used_at || new Date(verification.expires_at).getTime() < Date.now()) {
-    throw new HttpError(400, "验证链接已失效", "token");
-  }
+  if (!verification) throw new HttpError(400, "验证链接已失效", "token");
+  if (verification.used_at) return c.json({ ok: true });
+  if (new Date(verification.expires_at).getTime() < Date.now()) throw new HttpError(400, "验证链接已失效", "token");
   const now = new Date().toISOString();
   await db.patch(`profiles?id=eq.${verification.user_id}`, { email_verified_at: now });
   await db.patch(`email_verifications?id=eq.${verification.id}`, { used_at: now });
@@ -165,9 +165,9 @@ app.post("/api/auth/reset-password", async (c) => {
     `password_resets?token_hash=eq.${await sha256Hex(token)}&select=id,user_id,expires_at,used_at`,
   );
   const reset = rows[0];
-  if (!reset || reset.used_at || new Date(reset.expires_at).getTime() < Date.now()) {
-    throw new HttpError(400, "重置链接已失效", "token");
-  }
+  if (!reset) throw new HttpError(400, "重置链接已失效", "token");
+  if (reset.used_at) throw new HttpError(400, "这个链接已经用过，请直接登录", "token");
+  if (new Date(reset.expires_at).getTime() < Date.now()) throw new HttpError(400, "重置链接已失效", "token");
   await db.patch(`profiles?id=eq.${reset.user_id}`, { password_hash: await hashPassword(password) });
   await db.patch(`password_resets?id=eq.${reset.id}`, { used_at: new Date().toISOString() });
   await db.del(`sessions?user_id=eq.${reset.user_id}`);
@@ -316,6 +316,15 @@ app.post("/api/chat", async (c) => {
     return c.json({ conversationId, reply });
   } catch (error) {
     await releaseQuota(c.env, profile.id, "chat");
+    if (!conversationId) throw error;
+    if (error instanceof HttpError) {
+      error.details = { ...error.details, conversationId };
+      throw error;
+    }
+    if (error instanceof UpstreamError) {
+      const status = error.status === 402 ? 402 : error.status === 429 ? 429 : 502;
+      throw new HttpError(status, error.message, "upstream", { conversationId });
+    }
     throw error;
   }
 });
@@ -391,16 +400,25 @@ app.get("/api/videos/:id", async (c) => {
   const video = rows[0];
   if (!video) throw new HttpError(404, "找不到视频", "video");
   if (video.status === "processing" && video.provider_video_id) {
-    const polled = await pollVideo(await providerKey(c.env), video.provider_video_id);
-    if (polled.status === "completed" && polled.url) {
-      await db.patch(`videos?id=eq.${video.id}`, { status: "completed", url: polled.url });
-      video.status = "completed";
-      video.url = polled.url;
-    } else if (polled.status === "failed") {
-      await db.patch(`videos?id=eq.${video.id}`, { status: "failed", error: polled.error ?? "生成失败" });
-      video.status = "failed";
-      video.error = polled.error ?? "生成失败";
-      await releaseQuota(c.env, profile.id, "video");
+    try {
+      const polled = await pollVideo(await providerKey(c.env), video.provider_video_id);
+      if (polled.status === "completed" && polled.url) {
+        await db.patch(`videos?id=eq.${video.id}`, { status: "completed", url: polled.url });
+        video.status = "completed";
+        video.url = polled.url;
+      } else if (polled.status === "failed") {
+        await db.patch(`videos?id=eq.${video.id}`, { status: "failed", error: polled.error ?? "生成失败" });
+        video.status = "failed";
+        video.error = polled.error ?? "生成失败";
+        await releaseQuota(c.env, profile.id, "video");
+      }
+    } catch (error) {
+      if (error instanceof UpstreamError && (error.status === 401 || error.status === 403 || error.status === 402)) {
+        await db.patch(`videos?id=eq.${video.id}`, { status: "failed", error: error.message });
+        video.status = "failed";
+        video.error = error.message;
+        await releaseQuota(c.env, profile.id, "video");
+      }
     }
   }
   return c.json({ video });
@@ -465,12 +483,27 @@ async function verificationReady(env: Env): Promise<boolean> {
     await db.get("profiles?select=email_verified_at&limit=1");
     await db.get("email_verifications?select=id&limit=1");
     return true;
-  } catch {
-    return false;
+  } catch (error) {
+    if (isMissingSchema(error)) return false;
+    throw error;
   }
 }
 
+async function tooManyRecent(env: Env, table: "password_resets" | "email_verifications", userId: string): Promise<boolean> {
+  const since = new Date(Date.now() - 10 * 60 * 1000).toISOString();
+  const db = createDb(env);
+  const rows = await db.get<{ id: string }>(
+    `${table}?user_id=eq.${userId}&created_at=gt.${encodeURIComponent(since)}&select=id&limit=3`,
+  );
+  return rows.length >= 3;
+}
+
+function looksLikeEmail(email: string): boolean {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+}
+
 async function issueVerification(env: Env, userId: string, email: string): Promise<{ url: string; sent: boolean }> {
+  if (await tooManyRecent(env, "email_verifications", userId)) return { url: "", sent: true };
   const token = randomToken();
   const db = createDb(env);
   await db.post("email_verifications", {
@@ -503,19 +536,41 @@ async function reserveQuota(env: Env, userId: string, kind: UsageKind, limit: nu
   if (limit <= 0) throw new HttpError(402, "当前方案不包含这项，开通会员后可用", "quota");
   const day = shanghaiDay();
   const db = createDb(env);
-  const rows = await db.get<{ count: number }>(`usage_daily?user_id=eq.${userId}&day=eq.${day}&kind=eq.${kind}&select=count`);
-  const count = rows[0]?.count ?? 0;
-  if (count >= limit) throw new HttpError(429, "今天的额度用完了", "quota");
-  if (rows[0]) await db.patch(`usage_daily?user_id=eq.${userId}&day=eq.${day}&kind=eq.${kind}`, { count: count + 1 });
-  else await db.post("usage_daily", { user_id: userId, day, kind, count: 1 });
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const rows = await db.get<{ count: number }>(`usage_daily?user_id=eq.${userId}&day=eq.${day}&kind=eq.${kind}&select=count`);
+    const count = rows[0]?.count ?? 0;
+    if (count >= limit) throw new HttpError(429, "今天的额度用完了", "quota");
+    if (!rows[0]) {
+      try {
+        await db.post("usage_daily", { user_id: userId, day, kind, count: 1 });
+        return;
+      } catch (error) {
+        if (error instanceof DbError && error.code === "23505") continue;
+        throw error;
+      }
+    }
+    const updated = await db.patch<{ count: number }>(
+      `usage_daily?user_id=eq.${userId}&day=eq.${day}&kind=eq.${kind}&count=eq.${count}`,
+      { count: count + 1 },
+    );
+    if (updated.length > 0) return;
+  }
+  throw new HttpError(429, "今天的额度用完了", "quota");
 }
 
 async function releaseQuota(env: Env, userId: string, kind: UsageKind): Promise<void> {
   const day = shanghaiDay();
   const db = createDb(env);
-  const rows = await db.get<{ count: number }>(`usage_daily?user_id=eq.${userId}&day=eq.${day}&kind=eq.${kind}&select=count`);
-  const count = rows[0]?.count ?? 0;
-  if (count > 0) await db.patch(`usage_daily?user_id=eq.${userId}&day=eq.${day}&kind=eq.${kind}`, { count: count - 1 });
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const rows = await db.get<{ count: number }>(`usage_daily?user_id=eq.${userId}&day=eq.${day}&kind=eq.${kind}&select=count`);
+    const count = rows[0]?.count ?? 0;
+    if (count <= 0) return;
+    const updated = await db.patch<{ count: number }>(
+      `usage_daily?user_id=eq.${userId}&day=eq.${day}&kind=eq.${kind}&count=eq.${count}`,
+      { count: count - 1 },
+    );
+    if (updated.length > 0) return;
+  }
 }
 
 async function presentUser(env: Env, profile: Profile) {
@@ -536,6 +591,7 @@ async function presentUser(env: Env, profile: Profile) {
     planName: plan.name,
     planExpiresAt: isMember(profile) ? profile.plan_expires_at : null,
     member: isMember(profile),
+    maxImageSize: plan.max_image_size,
   };
   return {
     user,

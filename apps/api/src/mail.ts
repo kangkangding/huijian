@@ -15,6 +15,10 @@ async function sendMail(env: Env, to: string, subject: string, htmlContent: stri
     console.log(JSON.stringify({ event: "mail.skip", reason: "unconfigured" }));
     return false;
   }
+  if (apiKey.startsWith("xsmtpsib-")) {
+    console.log(JSON.stringify({ event: "mail.skip", reason: "smtp-key" }));
+    return false;
+  }
   const response = await fetch("https://api.brevo.com/v3/smtp/email", {
     method: "POST",
     headers: {

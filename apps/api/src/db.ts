@@ -1,5 +1,16 @@
 import type { Env } from "./types";
 
+export class DbError extends Error {
+  constructor(public status: number, public code: string) {
+    super("数据库请求失败");
+    this.name = "DbError";
+  }
+}
+
+export function isMissingSchema(error: unknown): boolean {
+  return error instanceof DbError && ["42703", "42P01", "PGRST204", "PGRST205"].includes(error.code);
+}
+
 export function createDb(env: Env) {
   const root = `${env.SUPABASE_URL.replace(/\/$/, "")}/rest/v1`;
 
@@ -17,13 +28,20 @@ export function createDb(env: Env) {
     });
     const text = await response.text();
     if (!response.ok) {
+      let code = "";
+      try {
+        code = (JSON.parse(text) as { code?: string }).code ?? "";
+      } catch {
+        code = "";
+      }
       console.log(JSON.stringify({
         event: "db.error",
         status: response.status,
         path: path.split("?")[0],
+        code,
         detail: text.slice(0, 180),
       }));
-      throw new Error("数据库请求失败");
+      throw new DbError(response.status, code);
     }
     if (!text) return [] as T;
     return JSON.parse(text) as T;

@@ -49,6 +49,7 @@ export async function createImage(apiKey: string, input: { prompt: string; ratio
       prompt: input.prompt,
       size: input.size,
       ratio: input.ratio,
+      extra_body: { response_format: "url" },
     }),
   });
   const url = readPath(body, ["data", "0", "url"]);

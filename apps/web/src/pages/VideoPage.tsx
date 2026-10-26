@@ -27,13 +27,35 @@ function VideoBody() {
 
   useEffect(() => {
     if (!current || current.status !== "processing") return undefined;
-    const timer = window.setInterval(async () => {
-      const data = await api<{ video: VideoItem }>(`/api/videos/${current.id}`);
-      setCurrent(data.video);
-      setVideos((items) => items.map((item) => item.id === data.video.id ? data.video : item));
-    }, 2000);
-    return () => window.clearInterval(timer);
-  }, [current]);
+    let stopped = false;
+    let timer = 0;
+    let wait = 2000;
+    let tries = 0;
+    const videoId = current.id;
+    async function tick() {
+      try {
+        const data = await api<{ video: VideoItem }>(`/api/videos/${videoId}`);
+        if (stopped) return;
+        setCurrent(data.video);
+        setVideos((items) => items.map((item) => item.id === data.video.id ? data.video : item));
+        if (data.video.status !== "processing") return;
+        tries += 1;
+        if (tries >= 40) {
+          setError("视频还在生成。可以过一会儿在列表里再打开。");
+          return;
+        }
+        wait = Math.min(10000, wait + 1000);
+        timer = window.setTimeout(tick, wait);
+      } catch (caught) {
+        if (!stopped) setError(caught instanceof Error ? caught.message : "查询失败");
+      }
+    }
+    timer = window.setTimeout(tick, wait);
+    return () => {
+      stopped = true;
+      window.clearTimeout(timer);
+    };
+  }, [current?.id, current?.status]);
 
   async function generate() {
     setPending(true);
@@ -54,6 +76,7 @@ function VideoBody() {
   }
 
   const usage = session?.usage.video;
+  const videoLocked = (usage?.limit ?? 0) <= 0;
 
   return (
     <section className="studio">
@@ -75,8 +98,8 @@ function VideoBody() {
           <input value={firstFrame} onChange={(event) => setFirstFrame(event.target.value)} placeholder="https://" />
         </label>
         <div className="row">
-          <button className="btn" type="button" onClick={generate} disabled={pending}>{pending ? "提交中…" : "生成视频"}</button>
-          <span className="quiet">今日 {usage?.used ?? 0} / {usage?.limit ?? 0}</span>
+          <button className="btn" type="button" onClick={generate} disabled={pending || videoLocked}>{pending ? "提交中…" : "生成视频"}</button>
+          <span className="quiet">{videoLocked ? "免费方案不能出视频，开通会员后每天 5 段。" : `今日 ${usage?.used ?? 0} / ${usage?.limit ?? 0}`}</span>
         </div>
         {error && <p className="error">{error}</p>}
       </div>

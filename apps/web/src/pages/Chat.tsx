@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from "react";
-import { api } from "../api";
+import { api, ApiError } from "../api";
 import { NeedLogin, useAuth } from "../auth";
 
 type Conversation = { id: string; title: string };
@@ -26,8 +26,13 @@ function ChatBody() {
 
   async function open(id: string) {
     setCurrent(id);
-    const data = await api<{ messages: Message[] }>(`/api/chat/conversations/${id}`);
-    setMessages(data.messages);
+    setError("");
+    try {
+      const data = await api<{ messages: Message[] }>(`/api/chat/conversations/${id}`);
+      setMessages(data.messages);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "读取失败");
+    }
   }
 
   async function onSubmit(event: FormEvent) {
@@ -49,6 +54,7 @@ function ChatBody() {
       setConversations(list.conversations);
       await refresh();
     } catch (caught) {
+      if (caught instanceof ApiError && caught.conversationId) setCurrent(caught.conversationId);
       setError(caught instanceof Error ? caught.message : "发送失败");
     } finally {
       setPending(false);

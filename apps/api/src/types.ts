@@ -49,4 +49,5 @@ export type PublicUser = {
   planName: string;
   planExpiresAt: string | null;
   member: boolean;
+  maxImageSize: string;
 };

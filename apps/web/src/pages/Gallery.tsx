@@ -20,26 +20,29 @@ function GalleryBody() {
       .catch((caught) => setError(caught instanceof Error ? caught.message : "读取失败"));
   }, []);
 
+  const pictures = images.filter((item) => item.url);
+  const clips = videos.filter((item) => item.url);
+
   return (
     <section>
       <p className="eyebrow">作品</p>
       <h1>你生成过的图和视频。</h1>
       {error && <p className="error">{error}</p>}
       <div className="gallery">
-        {images.filter((item) => item.url).map((item) => (
+        {pictures.map((item) => (
           <figure key={item.id}>
             <img src={item.url ?? ""} alt={item.prompt} />
             <figcaption>{item.prompt}</figcaption>
           </figure>
         ))}
-        {videos.filter((item) => item.url).map((item) => (
+        {clips.map((item) => (
           <figure key={item.id}>
             <video src={item.url ?? ""} controls />
             <figcaption>{item.prompt}</figcaption>
           </figure>
         ))}
       </div>
-      {images.length === 0 && videos.length === 0 && !error && <p className="quiet">还没有作品。去文生图写第一句。</p>}
+      {pictures.length === 0 && clips.length === 0 && !error && <p className="quiet">还没有完成的作品。去文生图写第一句。</p>}
     </section>
   );
 }

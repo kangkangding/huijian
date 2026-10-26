@@ -36,7 +36,7 @@ function AccountBody() {
       });
       setKeyState(next);
       setApiKey("");
-      setMessage("Agnes 密钥已保存，只留在数据库里。");
+      setMessage("已写入数据库。线上仍优先使用 Cloudflare 里的密钥。");
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "保存失败");
     }
@@ -81,7 +81,7 @@ function AccountBody() {
       {user.role === "admin" && (
         <form onSubmit={saveKey} className="key-form">
           <h2>Agnes 密钥</h2>
-          <p className="quiet">{keyState.configured ? `已配置 ${keyState.hint}` : "还没有密钥。第一个注册的账号是管理员。"}</p>
+          <p className="quiet">{keyState.configured ? `线上正在使用的密钥 ${keyState.hint}。这里保存的是数据库备份，Cloudflare 里的密钥优先。` : "还没有密钥。第一个注册的账号是管理员。"}</p>
           <label>新密钥
             <input type="password" value={apiKey} onChange={(event) => setApiKey(event.target.value)} autoComplete="off" />
           </label>

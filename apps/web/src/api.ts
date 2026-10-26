@@ -8,9 +8,13 @@ export const tokenStore = {
 
 export class ApiError extends Error {
   code: string;
-  constructor(message: string, code = "") {
+  status: number;
+  conversationId: string;
+  constructor(message: string, code = "", status = 0, conversationId = "") {
     super(message);
     this.code = code;
+    this.status = status;
+    this.conversationId = conversationId;
   }
 }
 
@@ -20,8 +24,8 @@ export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
   const token = tokenStore.get();
   if (token) headers.set("Authorization", `Bearer ${token}`);
   const response = await fetch(`${base}${path}`, { ...init, headers });
-  const data = (await response.json().catch(() => ({}))) as { error?: string; code?: string };
-  if (!response.ok) throw new ApiError(data.error || "请求失败", data.code ?? "");
+  const data = (await response.json().catch(() => ({}))) as { error?: string; code?: string; conversationId?: string };
+  if (!response.ok) throw new ApiError(data.error || "请求失败", data.code ?? "", response.status, data.conversationId ?? "");
   return data as T;
 }
 

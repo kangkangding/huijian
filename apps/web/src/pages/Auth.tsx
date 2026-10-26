@@ -18,6 +18,10 @@ export function Auth({ mode }: { mode: Mode }) {
   const [canResend, setCanResend] = useState(false);
 
   useEffect(() => {
+    if (mode === "reset" && !params.get("token")) setError("缺少重置凭证");
+  }, [mode, params]);
+
+  useEffect(() => {
     if (mode !== "verify") return;
     const token = params.get("token") ?? "";
     if (!token) {
@@ -138,7 +142,7 @@ export function Auth({ mode }: { mode: Mode }) {
           {error && <p className="error">{error}</p>}
           {canResend && <button className="text-btn" type="button" onClick={resend} disabled={pending}>重新发送验证邮件</button>}
           {message && <p className="ok">{message}</p>}
-          <button className="btn" type="submit" disabled={pending}>{pending ? "提交中…" : title}</button>
+          <button className="btn" type="submit" disabled={pending || (mode === "reset" && !params.get("token"))}>{pending ? "提交中…" : title}</button>
         </form>
       )}
       <p className="quiet">

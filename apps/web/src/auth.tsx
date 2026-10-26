@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
-import { api, tokenStore } from "./api";
+import { api, ApiError, tokenStore } from "./api";
 
 export type Session = {
   user: {
@@ -12,6 +12,7 @@ export type Session = {
     planName: string;
     planExpiresAt: string | null;
     member: boolean;
+    maxImageSize: string;
   };
   usage: {
     image: { used: number; limit: number };
@@ -43,7 +44,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     refresh()
-      .catch(() => tokenStore.clear())
+      .catch((caught) => {
+        if (caught instanceof ApiError && caught.status === 401) {
+          tokenStore.clear();
+          setSession(null);
+        }
+      })
       .finally(() => setReady(true));
   }, []);
 

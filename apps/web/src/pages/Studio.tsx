@@ -29,10 +29,15 @@ function StudioBody() {
   const [prompt, setPrompt] = useState(samples[0]);
   const [ratio, setRatio] = useState("1:1");
   const [size, setSize] = useState("1K");
+  const allow2k = session?.user.maxImageSize === "2K";
   const [error, setError] = useState("");
   const [pending, setPending] = useState(false);
   const [images, setImages] = useState<ImageItem[]>([]);
   const [current, setCurrent] = useState<ImageItem | null>(null);
+
+  useEffect(() => {
+    if (!allow2k) setSize("1K");
+  }, [allow2k]);
 
   useEffect(() => {
     api<{ images: ImageItem[] }>("/api/images").then((data) => {
@@ -81,8 +86,14 @@ function StudioBody() {
         </div>
         <div className="choices">
           {["1K", "2K"].map((value) => (
-            <button key={value} type="button" className={size === value ? "chip on" : "chip"} onClick={() => setSize(value)}>
-              {value === "1K" ? "标准 1K" : "高清 2K"}
+            <button
+              key={value}
+              type="button"
+              className={size === value ? "chip on" : "chip"}
+              disabled={value === "2K" && !allow2k}
+              onClick={() => setSize(value)}
+            >
+              {value === "1K" ? "标准 1K" : allow2k ? "高清 2K" : "高清 2K · 会员"}
             </button>
           ))}
         </div>

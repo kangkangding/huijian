@@ -7,6 +7,7 @@ export class HttpError extends Error {
     public status: 400 | 401 | 402 | 403 | 404 | 409 | 413 | 429 | 502,
     message: string,
     public code: string,
+    public details: Record<string, unknown> = {},
   ) {
     super(message);
   }
