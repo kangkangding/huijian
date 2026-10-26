@@ -21,6 +21,7 @@ export function App() {
             <Route path="/register" element={<Auth mode="register" />} />
             <Route path="/forgot" element={<Auth mode="forgot" />} />
             <Route path="/reset" element={<Auth mode="reset" />} />
+            <Route path="/verify" element={<Auth mode="verify" />} />
             <Route path="/studio" element={<Studio />} />
             <Route path="/chat" element={<Chat />} />
             <Route path="/video" element={<VideoPage />} />

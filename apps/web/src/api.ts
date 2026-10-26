@@ -6,7 +6,13 @@ export const tokenStore = {
   clear: () => localStorage.removeItem("huijian.token"),
 };
 
-export class ApiError extends Error {}
+export class ApiError extends Error {
+  code: string;
+  constructor(message: string, code = "") {
+    super(message);
+    this.code = code;
+  }
+}
 
 export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
   const headers = new Headers(init.headers);
@@ -14,8 +20,8 @@ export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
   const token = tokenStore.get();
   if (token) headers.set("Authorization", `Bearer ${token}`);
   const response = await fetch(`${base}${path}`, { ...init, headers });
-  const data = (await response.json().catch(() => ({}))) as { error?: string };
-  if (!response.ok) throw new ApiError(data.error || "请求失败");
+  const data = (await response.json().catch(() => ({}))) as { error?: string; code?: string };
+  if (!response.ok) throw new ApiError(data.error || "请求失败", data.code ?? "");
   return data as T;
 }
 

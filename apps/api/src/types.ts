@@ -20,6 +20,7 @@ export type Profile = {
   role: Role;
   plan_code: string;
   plan_expires_at: string | null;
+  email_verified_at?: string | null;
   created_at: string;
 };
 

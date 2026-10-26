@@ -3,7 +3,7 @@ import { cors } from "hono/cors";
 import { createChat, createImage, createVideo, IMAGE_MODEL, pollVideo, UpstreamError, VIDEO_MODEL } from "./agnes";
 import { createDb } from "./db";
 import { HttpError, readJson, type Vars } from "./http";
-import { sendPasswordReset } from "./mail";
+import { sendPasswordReset, sendVerification } from "./mail";
 import { hashPassword, randomToken, secretsMatch, sha256Hex, verifyPassword } from "./password";
 import {
   assertAccount,
@@ -59,6 +59,16 @@ app.post("/api/auth/register", async (c) => {
     role: users.length === 0 ? "admin" : "user",
     plan_code: "free",
   });
+  if (await verificationReady(c.env)) {
+    const verification = await issueVerification(c.env, rows[0].id, account.email);
+    return c.json({
+      ok: true,
+      message: verification.sent
+        ? "验证邮件已经发出，30 分钟内有效。请查看收件箱和垃圾邮件。"
+        : "账号已创建，但验证邮件没发出去。请到登录页重新发送。",
+      verifyUrl: c.env.APP_ENV === "development" ? verification.url : undefined,
+    });
+  }
   const token = await issueSession(c.env, rows[0].id);
   return c.json({ token, ...(await presentUser(c.env, rows[0])) });
 });
@@ -73,6 +83,7 @@ app.post("/api/auth/login", async (c) => {
   if (!profile || !(await verifyPassword(password, profile.password_hash))) {
     throw new HttpError(401, "邮箱或密码不正确", "auth");
   }
+  if (profile.email_verified_at === null) throw new HttpError(403, "请先到邮箱确认账号", "email");
   const token = await issueSession(c.env, profile.id);
   return c.json({ token, ...(await presentUser(c.env, profile)) });
 });
@@ -110,6 +121,37 @@ app.post("/api/auth/forgot-password", async (c) => {
     message: "如果这个邮箱已注册，重置邮件已经发出，30 分钟内有效。请查看收件箱和垃圾邮件。",
     resetUrl: c.env.APP_ENV === "development" ? resetUrl : undefined,
   });
+});
+
+app.post("/api/auth/resend-verification", async (c) => {
+  const body = await readJson<{ email?: string }>(c);
+  const email = (body.email ?? "").trim().toLowerCase();
+  const message = "如果这个邮箱已注册且尚未确认，验证邮件已经发出。";
+  if (await verificationReady(c.env)) {
+    const db = createDb(c.env);
+    const rows = await db.get<Profile>(`profiles?email=eq.${encodeURIComponent(email)}&select=*`);
+    const profile = rows[0];
+    if (profile && profile.email_verified_at === null) await issueVerification(c.env, profile.id, email);
+  }
+  return c.json({ ok: true, message });
+});
+
+app.post("/api/auth/verify-email", async (c) => {
+  const body = await readJson<{ token?: string }>(c);
+  const token = (body.token ?? "").trim();
+  if (!token) throw new HttpError(400, "缺少验证凭证", "token");
+  const db = createDb(c.env);
+  const rows = await db.get<{ id: string; user_id: string; expires_at: string; used_at: string | null }>(
+    `email_verifications?token_hash=eq.${await sha256Hex(token)}&select=id,user_id,expires_at,used_at`,
+  );
+  const verification = rows[0];
+  if (!verification || verification.used_at || new Date(verification.expires_at).getTime() < Date.now()) {
+    throw new HttpError(400, "验证链接已失效", "token");
+  }
+  const now = new Date().toISOString();
+  await db.patch(`profiles?id=eq.${verification.user_id}`, { email_verified_at: now });
+  await db.patch(`email_verifications?id=eq.${verification.id}`, { used_at: now });
+  return c.json({ ok: true });
 });
 
 app.post("/api/auth/reset-password", async (c) => {
@@ -415,6 +457,32 @@ async function issueSession(env: Env, userId: string): Promise<string> {
     expires_at: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
   });
   return token;
+}
+
+async function verificationReady(env: Env): Promise<boolean> {
+  const db = createDb(env);
+  try {
+    await db.get("profiles?select=email_verified_at&limit=1");
+    await db.get("email_verifications?select=id&limit=1");
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function issueVerification(env: Env, userId: string, email: string): Promise<{ url: string; sent: boolean }> {
+  const token = randomToken();
+  const db = createDb(env);
+  await db.post("email_verifications", {
+    user_id: userId,
+    token_hash: await sha256Hex(token),
+    expires_at: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
+  });
+  const url = `${env.APP_ORIGIN.replace(/\/$/, "")}/verify?token=${token}`;
+  if (env.APP_ENV === "development") return { url, sent: true };
+  const sent = await sendVerification(env, email, url);
+  if (!sent) console.log(JSON.stringify({ event: "verify.unsent", userId }));
+  return { url, sent };
 }
 
 async function loadPlans(env: Env): Promise<Plan[]> {
