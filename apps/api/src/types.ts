@@ -4,6 +4,9 @@ export type Env = {
   APP_ORIGIN: string;
   APP_ENV: string;
   PAYMENT_WEBHOOK_SECRET: string;
+  ALIPAY_APP_ID?: string;
+  ALIPAY_PRIVATE_KEY?: string;
+  ALIPAY_PUBLIC_KEY?: string;
   AGNES_API_KEY?: string;
   BREVO_API_KEY?: string;
   BREVO_SENDER_EMAIL?: string;

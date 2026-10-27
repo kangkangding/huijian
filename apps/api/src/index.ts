@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { createChat, createImage, createVideo, IMAGE_MODEL, pollVideo, UpstreamError, VIDEO_MODEL } from "./agnes";
+import { amountCents, createWapPayUrl, queryTrade, verifyNotify } from "./alipay";
 import { createDb, DbError, isMissingSchema } from "./db";
 import { HttpError, readJson, type Vars } from "./http";
 import { sendPasswordReset, sendVerification } from "./mail";
@@ -216,14 +217,82 @@ app.get("/api/membership/orders", async (c) => {
   return c.json({ orders });
 });
 
+app.post("/api/membership/orders/:id/pay", async (c) => {
+  const profile = await requireUser(c);
+  const order = await loadOwnedOrder(c.env, c.req.param("id"), profile.id);
+  if (order.status !== "pending") throw new HttpError(409, "订单已处理", "order");
+  const plans = await loadPlans(c.env);
+  const plan = plans.find((item) => item.code === order.plan_code);
+  const origin = c.env.APP_ORIGIN.replace(/\/$/, "");
+  try {
+    const payUrl = await createWapPayUrl({
+      ...alipayConfig(c.env),
+      notifyUrl: "https://huijian-api.851615943.workers.dev/api/payments/alipay/notify",
+      returnUrl: `${origin}/account?paid=1`,
+      quitUrl: `${origin}/pricing`,
+      orderId: order.id,
+      amountCents: order.amount_cents,
+      subject: `绘简${plan?.name ?? "会员"}`,
+    });
+    return c.json({ payUrl });
+  } catch (error) {
+    if (error instanceof HttpError) throw error;
+    console.log(JSON.stringify({ event: "alipay.sign", message: error instanceof Error ? error.message : "unknown" }));
+    throw new HttpError(502, "支付宝暂时不可用", "payment");
+  }
+});
+
+app.post("/api/membership/orders/:id/sync", async (c) => {
+  const profile = await requireUser(c);
+  const order = await loadOwnedOrder(c.env, c.req.param("id"), profile.id);
+  if (order.status === "paid") {
+    const fresh = await createDb(c.env).get<Profile>(`profiles?id=eq.${profile.id}&select=*`);
+    return c.json(await presentUser(c.env, fresh[0] ?? profile));
+  }
+  let result: { paid: boolean; amountCents: number | null };
+  try {
+    result = await queryTrade({ ...alipayConfig(c.env), orderId: order.id });
+  } catch (error) {
+    if (error instanceof HttpError) throw error;
+    console.log(JSON.stringify({ event: "alipay.query", message: error instanceof Error ? error.message : "unknown" }));
+    throw new HttpError(502, "还没有查到支付结果", "payment");
+  }
+  if (!result.paid || result.amountCents !== order.amount_cents) return c.json({ status: "pending" });
+  const next = await markOrderPaid(c.env, order);
+  return c.json(await presentUser(c.env, next));
+});
+
+app.post("/api/payments/alipay/notify", async (c) => {
+  const params = Object.fromEntries(new URLSearchParams(await c.req.text()));
+  const config = alipayKeys(c.env);
+  if (!config) return c.text("failure");
+  const verified = await verifyNotify(config.publicKey, params).catch(() => false);
+  const paid = params.trade_status === "TRADE_SUCCESS" || params.trade_status === "TRADE_FINISHED";
+  const cents = amountCents(params.total_amount ?? "");
+  if (!verified || params.app_id !== config.appId || !paid || cents === null || !isUuid(params.out_trade_no ?? "")) {
+    console.log(JSON.stringify({ event: "alipay.notify", verified, status: params.trade_status ?? "" }));
+    return c.text("failure");
+  }
+  const db = createDb(c.env);
+  const rows = await db.get<PaidOrder>(`orders?id=eq.${params.out_trade_no}&select=id,user_id,plan_code,status,amount_cents`);
+  const order = rows[0];
+  if (!order || order.amount_cents !== cents) return c.text("failure");
+  try {
+    if (order.status === "pending") await markOrderPaid(c.env, order);
+  } catch (error) {
+    console.log(JSON.stringify({ event: "alipay.notify", message: error instanceof Error ? error.message : "unknown" }));
+    return c.text("failure");
+  }
+  return c.text("success");
+});
+
 app.post("/api/membership/orders/:id/confirm", async (c) => {
   const secret = c.req.header("X-Payment-Secret") ?? "";
   const webhookOk = await secretsMatch(secret, c.env.PAYMENT_WEBHOOK_SECRET ?? "");
-  const db = createDb(c.env);
   const orderId = c.req.param("id");
-  const rows = await db.get<{ id: string; user_id: string; plan_code: string; status: string }>(
-    `orders?id=eq.${orderId}&select=id,user_id,plan_code,status`,
-  );
+  if (!isUuid(orderId)) throw new HttpError(404, "找不到订单", "order");
+  const db = createDb(c.env);
+  const rows = await db.get<PaidOrder>(`orders?id=eq.${orderId}&select=id,user_id,plan_code,status,amount_cents`);
   const order = rows[0];
   if (!order) throw new HttpError(404, "找不到订单", "order");
   if (!webhookOk) {
@@ -232,19 +301,8 @@ app.post("/api/membership/orders/:id/confirm", async (c) => {
     if (order.user_id !== profile.id) throw new HttpError(404, "找不到订单", "order");
   }
   if (order.status !== "pending") throw new HttpError(409, "订单已处理", "order");
-  const plans = await loadPlans(c.env);
-  const plan = plans.find((item) => item.code === order.plan_code);
-  if (!plan) throw new HttpError(400, "方案已下架", "plan");
-  const updated = await db.patch<{ id: string }>(
-    `orders?id=eq.${order.id}&status=eq.pending`,
-    { status: "paid", paid_at: new Date().toISOString() },
-  );
-  if (updated.length === 0) throw new HttpError(409, "订单已处理", "order");
-  const fresh = await db.get<Profile>(`profiles?id=eq.${order.user_id}&select=*`);
-  const expiry = extendExpiry(fresh[0]?.plan_expires_at ?? null, plan.duration_days);
-  await db.patch(`profiles?id=eq.${order.user_id}`, { plan_code: plan.code, plan_expires_at: expiry });
-  const next = await db.get<Profile>(`profiles?id=eq.${order.user_id}&select=*`);
-  return c.json(await presentUser(c.env, next[0]));
+  const next = await markOrderPaid(c.env, order);
+  return c.json(await presentUser(c.env, next));
 });
 
 app.post("/api/images", async (c) => {
@@ -471,6 +529,57 @@ async function requireUser(c: { env: Env; req: { header: (name: string) => strin
   if (!rows[0]) throw new HttpError(401, "请先登录", "auth");
   c.set("user", rows[0]);
   return rows[0];
+}
+
+type PaidOrder = { id: string; user_id: string; plan_code: string; status: string; amount_cents: number };
+
+function isUuid(value: string): boolean {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
+}
+
+function alipayKeys(env: Env): { appId: string; privateKey: string; publicKey: string } | null {
+  const appId = env.ALIPAY_APP_ID?.trim() ?? "";
+  const privateKey = env.ALIPAY_PRIVATE_KEY?.trim() ?? "";
+  const publicKey = env.ALIPAY_PUBLIC_KEY?.trim() ?? "";
+  if (appId.length < 16 || privateKey.length < 80 || publicKey.length < 80) return null;
+  return { appId, privateKey, publicKey };
+}
+
+function alipayConfig(env: Env): { appId: string; privateKey: string; publicKey: string } {
+  const config = alipayKeys(env);
+  if (!config) throw new HttpError(502, "还没有配置支付宝", "payment");
+  return config;
+}
+
+async function loadOwnedOrder(env: Env, orderId: string, userId: string): Promise<PaidOrder> {
+  if (!isUuid(orderId)) throw new HttpError(404, "找不到订单", "order");
+  const rows = await createDb(env).get<PaidOrder>(
+    `orders?id=eq.${orderId}&user_id=eq.${userId}&select=id,user_id,plan_code,status,amount_cents`,
+  );
+  if (!rows[0]) throw new HttpError(404, "找不到订单", "order");
+  return rows[0];
+}
+
+async function markOrderPaid(env: Env, order: PaidOrder): Promise<Profile> {
+  const db = createDb(env);
+  if (order.status === "pending") {
+    const plans = await loadPlans(env);
+    const plan = plans.find((item) => item.code === order.plan_code);
+    if (!plan) throw new HttpError(400, "方案已下架", "plan");
+    const updated = await db.patch<{ id: string }>(
+      `orders?id=eq.${order.id}&status=eq.pending`,
+      { status: "paid", paid_at: new Date().toISOString() },
+    );
+    if (updated.length > 0) {
+      const fresh = await db.get<Profile>(`profiles?id=eq.${order.user_id}&select=*`);
+      const expiry = extendExpiry(fresh[0]?.plan_expires_at ?? null, plan.duration_days);
+      await db.patch(`profiles?id=eq.${order.user_id}`, { plan_code: plan.code, plan_expires_at: expiry });
+      console.log(JSON.stringify({ event: "membership.paid", userId: order.user_id, orderId: order.id }));
+    }
+  }
+  const next = await db.get<Profile>(`profiles?id=eq.${order.user_id}&select=*`);
+  if (!next[0]) throw new HttpError(404, "找不到订单", "order");
+  return next[0];
 }
 
 async function issueSession(env: Env, userId: string): Promise<string> {

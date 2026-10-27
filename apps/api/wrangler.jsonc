@@ -13,6 +13,7 @@
     "APP_ENV": "production",
     "APP_ORIGIN": "https://oranook.com",
     "SUPABASE_URL": "https://zlhyaycmqeljtnznhnqj.supabase.co",
+    "ALIPAY_APP_ID": "2017010404830995",
     "BREVO_SENDER_EMAIL": "noreply@mail.oranook.com",
     "BREVO_SENDER_NAME": "绘简"
   }

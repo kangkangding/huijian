@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from "react";
+import { useSearchParams } from "react-router-dom";
 import { api, yuan } from "../api";
-import { NeedLogin, useAuth, type Session } from "../auth";
+import { NeedLogin, useAuth } from "../auth";
 
 type Order = { id: string; plan_code: string; amount_cents: number; status: string; created_at: string };
 type KeyState = { configured: boolean; hint: string };
@@ -11,6 +12,7 @@ export function Account() {
 
 function AccountBody() {
   const { session, refresh } = useAuth();
+  const [params] = useSearchParams();
   const [orders, setOrders] = useState<Order[]>([]);
   const [keyState, setKeyState] = useState<KeyState>({ configured: false, hint: "" });
   const [apiKey, setApiKey] = useState("");
@@ -18,13 +20,31 @@ function AccountBody() {
   const [message, setMessage] = useState("");
 
   useEffect(() => {
-    api<{ orders: Order[] }>("/api/membership/orders")
-      .then((data) => setOrders(data.orders))
-      .catch((caught) => setError(caught instanceof Error ? caught.message : "读取失败"));
+    let cancel = false;
+    async function load() {
+      const data = await api<{ orders: Order[] }>("/api/membership/orders");
+      let next = data.orders;
+      if (params.get("paid") === "1") {
+        const pendingOrders = next.filter((order) => order.status === "pending");
+        if (pendingOrders.length > 0) {
+          await Promise.all(pendingOrders.map((order) => api(`/api/membership/orders/${order.id}/sync`, { method: "POST" }).catch(() => undefined)));
+          next = (await api<{ orders: Order[] }>("/api/membership/orders")).orders;
+          await refresh();
+          if (!cancel) setMessage(next.some((order) => order.status === "paid") ? "支付结果已更新" : "支付结果还在确认，请稍后再看");
+        }
+      }
+      if (!cancel) setOrders(next);
+    }
+    load().catch((caught) => {
+      if (!cancel) setError(caught instanceof Error ? caught.message : "读取失败");
+    });
     if (session?.user.role === "admin") {
       api<KeyState>("/api/admin/provider-key").then(setKeyState).catch(() => undefined);
     }
-  }, [session?.user.role]);
+    return () => {
+      cancel = true;
+    };
+  }, [session?.user.role, params]);
 
   async function saveKey(event: FormEvent) {
     event.preventDefault();
@@ -42,15 +62,26 @@ function AccountBody() {
     }
   }
 
-  async function confirm(id: string) {
+  async function pay(id: string) {
+    setError("");
     try {
-      await api<Session>(`/api/membership/orders/${id}/confirm`, { method: "POST" });
-      setMessage("会员已开通");
-      await refresh();
+      const data = await api<{ payUrl: string }>(`/api/membership/orders/${id}/pay`, { method: "POST" });
+      window.location.assign(data.payUrl);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "支付失败");
+    }
+  }
+
+  async function sync(id: string) {
+    setError("");
+    try {
+      const result = await api<{ status?: string }>(`/api/membership/orders/${id}/sync`, { method: "POST" });
       const data = await api<{ orders: Order[] }>("/api/membership/orders");
       setOrders(data.orders);
+      await refresh();
+      setMessage(result.status === "pending" ? "支付宝还没有确认这笔付款" : "支付结果已更新");
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "确认失败");
+      setError(caught instanceof Error ? caught.message : "还没有查到支付结果");
     }
   }
 
@@ -72,8 +103,9 @@ function AccountBody() {
       <ul className="plain">
         {orders.map((order) => (
           <li key={order.id}>
-            {order.plan_code} · {yuan(order.amount_cents)} 元 · {order.status}
-            {order.status === "pending" && <button type="button" className="text-btn" onClick={() => confirm(order.id)}>确认开通</button>}
+            {order.plan_code} · {yuan(order.amount_cents)} 元 · {order.status === "paid" ? "已支付" : order.status === "pending" ? "待支付" : order.status}
+            {order.status === "pending" && <button type="button" className="text-btn" onClick={() => pay(order.id)}>继续支付</button>}
+            {order.status === "pending" && <button type="button" className="text-btn" onClick={() => sync(order.id)}>我已支付</button>}
           </li>
         ))}
       </ul>

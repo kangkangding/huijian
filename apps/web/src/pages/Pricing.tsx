@@ -1,16 +1,14 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api, yuan, type Plan } from "../api";
-import { useAuth, type Session } from "../auth";
+import { useAuth } from "../auth";
 
 type Order = { id: string; plan_code: string; amount_cents: number; status: string };
 
 export function Pricing() {
-  const { session, refresh } = useAuth();
+  const { session } = useAuth();
   const [plans, setPlans] = useState<Plan[]>([]);
-  const [order, setOrder] = useState<Order | null>(null);
   const [error, setError] = useState("");
-  const [message, setMessage] = useState("");
   const [pending, setPending] = useState("");
 
   useEffect(() => {
@@ -21,32 +19,16 @@ export function Pricing() {
 
   async function buy(code: string) {
     setError("");
-    setMessage("");
     setPending(code);
     try {
       const data = await api<{ order: Order }>("/api/membership/orders", {
         method: "POST",
         body: JSON.stringify({ planCode: code }),
       });
-      setOrder(data.order);
-      setMessage(`订单已建立，应付 ${yuan(data.order.amount_cents)} 元。本地开发可以直接确认开通。`);
+      const pay = await api<{ payUrl: string }>(`/api/membership/orders/${data.order.id}/pay`, { method: "POST" });
+      window.location.assign(pay.payUrl);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "下单失败");
-    } finally {
-      setPending("");
-    }
-  }
-
-  async function confirm() {
-    if (!order) return;
-    setPending(order.id);
-    try {
-      const data = await api<Session>(`/api/membership/orders/${order.id}/confirm`, { method: "POST" });
-      setMessage(`已开通 ${data.user.planName}`);
-      await refresh();
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "确认失败");
-    } finally {
       setPending("");
     }
   }
@@ -57,7 +39,7 @@ export function Pricing() {
     <section>
       <p className="eyebrow">会员</p>
       <h1>先免费试，需要时再开通。</h1>
-      <p className="lede">月费 9.9 元。限时方案 1.9 元，同样 30 天。生产环境由支付回调携带密钥确认订单，避免页面自己改会员。</p>
+      <p className="lede">月费 9.9 元。限时方案 1.9 元，同样 30 天。开通后跳转支付宝，付款成功才会开通会员。</p>
       <div className="cards pricing">
         {visible.map((plan) => (
           <article key={plan.code} className={plan.promo ? "featured" : ""}>
@@ -82,8 +64,6 @@ export function Pricing() {
           </article>
         ))}
       </div>
-      {order && <button className="btn" type="button" onClick={confirm} disabled={pending === order.id}>确认这笔 {yuan(order.amount_cents)} 元订单</button>}
-      {message && <p className="ok">{message}</p>}
       {error && <p className="error">{error}</p>}
     </section>
   );
