@@ -108,7 +108,7 @@ function StudioBody() {
       </div>
       <div className="stage">
         {current?.url ? <img src={current.url} alt={current.prompt} /> : <div className="empty">生成结果会停在这里。</div>}
-        {current?.url && <DownloadButton path={`/api/images/${current.id}/file`} name="huijian-image" />}
+        {current?.url && <DownloadButton path={`/api/images/${current.id}/file`} name="huijian-image" at={current.created_at} />}
         {current && <p>{current.prompt}</p>}
         <div className="thumbs">
           {images.filter((item) => item.url).slice(0, 8).map((item) => (

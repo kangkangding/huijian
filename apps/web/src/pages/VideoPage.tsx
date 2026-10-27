@@ -106,7 +106,7 @@ function VideoBody() {
       </div>
       <div className="stage">
         {current?.url && <video src={current.url} controls />}
-        {current?.url && <DownloadButton path={`/api/videos/${current.id}/file`} name="huijian-video" />}
+        {current?.url && <DownloadButton path={`/api/videos/${current.id}/file`} name="huijian-video" at={current.created_at} />}
         {!current?.url && <div className="empty">{current?.status === "processing" ? "视频还在生成，每两秒看一次。" : current?.error || "视频会停在这里。"}</div>}
         <ul className="plain">
           {videos.map((item) => (

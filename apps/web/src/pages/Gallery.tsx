@@ -34,14 +34,14 @@ function GalleryBody() {
           <figure key={item.id}>
             <img src={item.url ?? ""} alt={item.prompt} />
             <figcaption>{item.prompt}</figcaption>
-            <DownloadButton path={`/api/images/${item.id}/file`} name="huijian-image" />
+            <DownloadButton path={`/api/images/${item.id}/file`} name="huijian-image" at={item.created_at} />
           </figure>
         ))}
         {clips.map((item) => (
           <figure key={item.id}>
             <video src={item.url ?? ""} controls />
             <figcaption>{item.prompt}</figcaption>
-            <DownloadButton path={`/api/videos/${item.id}/file`} name="huijian-video" />
+            <DownloadButton path={`/api/videos/${item.id}/file`} name="huijian-video" at={item.created_at} />
           </figure>
         ))}
       </div>
