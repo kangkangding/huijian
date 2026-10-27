@@ -20,7 +20,7 @@ export function Home() {
             <Link className="btn" to="/studio">开始作图</Link>
             <Link className="btn ghost" to="/pricing">限时 1.9 元</Link>
           </div>
-          <p className="quiet">免费每天 3 张图、20 条问答。会员每天 60 张图、200 条问答、5 段视频。</p>
+          <p className="quiet">免费每天 10 张图、200 条问答。会员每天 100 张图、2000 条问答、5 段视频。</p>
         </div>
         <div className="posters" aria-hidden="true">
           <article className="poster cup">

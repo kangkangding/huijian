@@ -70,7 +70,7 @@ export function Pricing() {
 }
 
 const fallback: Plan[] = [
-  { code: "free", name: "免费", priceCents: 0, durationDays: 0, promo: false, imageDaily: 3, chatDaily: 20, videoDaily: 0, maxImageSize: "1K", description: "每天 3 张图、20 条问答，适合先试一句。" },
-  { code: "launch", name: "限时会员", priceCents: 190, durationDays: 30, promo: true, imageDaily: 60, chatDaily: 200, videoDaily: 5, maxImageSize: "2K", description: "限时 1.9 元开通 30 天。" },
-  { code: "monthly", name: "月费会员", priceCents: 990, durationDays: 30, promo: false, imageDaily: 60, chatDaily: 200, videoDaily: 5, maxImageSize: "2K", description: "9.9 元开通 30 天。" },
+  { code: "free", name: "免费", priceCents: 0, durationDays: 0, promo: false, imageDaily: 10, chatDaily: 200, videoDaily: 0, maxImageSize: "1K", description: "每天 10 张图、200 条问答，适合先试一句。" },
+  { code: "launch", name: "限时会员", priceCents: 190, durationDays: 30, promo: true, imageDaily: 100, chatDaily: 2000, videoDaily: 5, maxImageSize: "2K", description: "限时 1.9 元开通 30 天。每天 100 张图、2000 条问答、5 段视频。" },
+  { code: "monthly", name: "月费会员", priceCents: 990, durationDays: 30, promo: false, imageDaily: 100, chatDaily: 2000, videoDaily: 5, maxImageSize: "2K", description: "9.9 元开通 30 天，额度和限时会员相同。" },
 ];

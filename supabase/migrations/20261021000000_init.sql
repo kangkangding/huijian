@@ -115,9 +115,9 @@ create index messages_conversation_idx on public.messages (conversation_id, crea
 
 insert into public.plans (code, name, price_cents, duration_days, promo, active, image_daily, chat_daily, video_daily, max_image_size, description)
 values
-  ('free', '免费', 0, 0, false, true, 3, 20, 0, '1K', '每天 3 张图、20 条问答，适合先试一句。'),
-  ('launch', '限时会员', 190, 30, true, true, 60, 200, 5, '2K', '限时 1.9 元开通 30 天。每天 60 张图、200 条问答、5 段视频。'),
-  ('monthly', '月费会员', 990, 30, false, true, 60, 200, 5, '2K', '9.9 元开通 30 天，额度和限时会员相同。');
+  ('free', '免费', 0, 0, false, true, 10, 200, 0, '1K', '每天 10 张图、200 条问答，适合先试一句。'),
+  ('launch', '限时会员', 190, 30, true, true, 100, 2000, 5, '2K', '限时 1.9 元开通 30 天。每天 100 张图、2000 条问答、5 段视频。'),
+  ('monthly', '月费会员', 990, 30, false, true, 100, 2000, 5, '2K', '9.9 元开通 30 天，额度和限时会员相同。');
 
 alter table public.profiles enable row level security;
 alter table public.sessions enable row level security;
