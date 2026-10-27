@@ -4,7 +4,7 @@
 
 页面设计在 Figma：https://www.figma.com/design/bD3LSG34hORLVZSAgMBXW4
 
-前端发布到 Cloudflare Pages，接口跑在 Cloudflare Workers，数据放在 Supabase。聊天、图片和视频都由 Workers 读取数据库里的 Agnes 密钥，再转发到 Agnes 会员接口。密钥不会进前端，也不会进仓库。
+前端发布到 Cloudflare Pages，接口跑在 Cloudflare Workers，数据放在 Supabase。聊天、图片和视频由 Workers 用 Cloudflare 里的国内密钥转发到 Agnes 中国站。这一边失败时，自动改用国际密钥和国际站。视频的创建和查询保持同一边。密钥不会进前端，也不会进仓库。
 
 ## 方案
 

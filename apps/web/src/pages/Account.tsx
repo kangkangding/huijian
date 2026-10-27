@@ -4,7 +4,7 @@ import { api, yuan } from "../api";
 import { NeedLogin, useAuth } from "../auth";
 
 type Order = { id: string; plan_code: string; amount_cents: number; status: string; created_at: string };
-type KeyState = { configured: boolean; hint: string };
+type KeyState = { configured: boolean; hint: string; fallback?: boolean };
 
 export function Account() {
   return <NeedLogin><AccountBody /></NeedLogin>;
@@ -113,7 +113,7 @@ function AccountBody() {
       {user.role === "admin" && (
         <form onSubmit={saveKey} className="key-form">
           <h2>Agnes 密钥</h2>
-          <p className="quiet">{keyState.configured ? `线上正在使用的密钥 ${keyState.hint}。这里保存的是数据库备份，Cloudflare 里的密钥优先。` : "还没有密钥。第一个注册的账号是管理员。"}</p>
+          <p className="quiet">{keyState.configured ? (keyState.fallback ? `国内密钥 ${keyState.hint}。这一边失败时会自动改用国际密钥。数据库里只是国内密钥的备份，Cloudflare 里的密钥优先。` : `线上正在使用的密钥 ${keyState.hint}。这里保存的是数据库备份，Cloudflare 里的密钥优先。`) : "还没有密钥。第一个注册的账号是管理员。"}</p>
           <label>新密钥
             <input type="password" value={apiKey} onChange={(event) => setApiKey(event.target.value)} autoComplete="off" />
           </label>

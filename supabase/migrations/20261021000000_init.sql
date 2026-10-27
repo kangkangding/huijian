@@ -97,6 +97,7 @@ create table public.videos (
   seconds text not null,
   model text not null,
   provider_video_id text,
+  upstream text not null default 'cn',
   url text,
   status text not null,
   error text,

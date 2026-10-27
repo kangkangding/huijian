@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
-import { createChat, createImage, createVideo, IMAGE_MODEL, pollVideo, UpstreamError, VIDEO_MODEL } from "./agnes";
+import { createChat, createImage, createVideo, IMAGE_MODEL, pollVideo, UpstreamError, VIDEO_MODEL, type AgnesAccount, type AgnesSite } from "./agnes";
 import { amountCents, createWapPayUrl, queryTrade, verifyNotify } from "./alipay";
 import { createDb, DbError, isMissingSchema } from "./db";
 import { HttpError, readJson, type Vars } from "./http";
@@ -313,7 +313,7 @@ app.post("/api/images", async (c) => {
   await reserveQuota(c.env, profile.id, "image", quotaLimit(plan, "image"));
   const db = createDb(c.env);
   try {
-    const url = await createImage(await providerKey(c.env), input);
+    const url = await createImage(await loadAccounts(c.env), input);
     const rows = await db.post("images", {
       user_id: profile.id,
       prompt: input.prompt,
@@ -372,7 +372,7 @@ app.post("/api/chat", async (c) => {
     const history = await db.get<{ role: "user" | "assistant"; content: string }>(
       `messages?conversation_id=eq.${conversationId}&select=role,content&order=created_at.desc&limit=12`,
     );
-    const reply = await createChat(await providerKey(c.env), [
+    const reply = await createChat(await loadAccounts(c.env), [
       { role: "system", content: CHAT_SYSTEM },
       ...history.reverse().map((item) => ({ role: item.role, content: item.content })),
     ], isMember(profile) ? 800 : 400);
@@ -421,19 +421,22 @@ app.post("/api/videos", async (c) => {
   await reserveQuota(c.env, profile.id, "video", quotaLimit(plan, "video"));
   const db = createDb(c.env);
   try {
-    const videoId = await createVideo(await providerKey(c.env), input);
-    const rows = await db.post("videos", {
+    const created = await createVideo(await loadAccounts(c.env), input);
+    const rows = await db.post<VideoRow>("videos", {
       user_id: profile.id,
       prompt: input.prompt,
       mode: input.mode,
       aspect_ratio: input.aspectRatio,
       seconds: input.seconds,
       model: VIDEO_MODEL,
-      provider_video_id: videoId,
+      provider_video_id: created.videoId,
+      upstream: created.site,
       status: "processing",
     });
-    console.log(JSON.stringify({ event: "video.created", userId: profile.id }));
-    return c.json({ video: rows[0] });
+    console.log(JSON.stringify({ event: "video.created", userId: profile.id, site: created.site }));
+    const video = rows[0];
+    if (!video) throw new HttpError(502, "视频没有保存下来", "video");
+    return c.json({ video: publicVideo(video) });
   } catch (error) {
     await releaseQuota(c.env, profile.id, "video");
     throw error;
@@ -453,20 +456,15 @@ app.get("/api/videos/:id", async (c) => {
   const profile = await requireUser(c);
   const db = createDb(c.env);
   const id = c.req.param("id");
-  const rows = await db.get<{
-    id: string;
-    user_id: string;
-    status: string;
-    provider_video_id: string | null;
-    url: string | null;
-    error: string | null;
-    prompt: string;
-  }>(`videos?id=eq.${id}&user_id=eq.${profile.id}&select=id,user_id,status,provider_video_id,url,error,prompt,mode,aspect_ratio,seconds,created_at`);
+  const rows = await db.get<VideoRow>(`videos?id=eq.${id}&user_id=eq.${profile.id}&select=id,user_id,status,provider_video_id,upstream,url,error,prompt,mode,aspect_ratio,seconds,created_at`);
   const video = rows[0];
   if (!video) throw new HttpError(404, "找不到视频", "video");
   if (video.status === "processing" && video.provider_video_id) {
+    const site: AgnesSite = video.upstream === "intl" ? "intl" : "cn";
+    const account = (await loadAccounts(c.env)).find((item) => item.site === site);
+    if (!account) return c.json({ video: publicVideo(video) });
     try {
-      const polled = await pollVideo(await providerKey(c.env), video.provider_video_id);
+      const polled = await pollVideo(account, video.provider_video_id);
       if (polled.status === "completed" && polled.url) {
         await db.patch(`videos?id=eq.${video.id}`, { status: "completed", url: polled.url });
         video.status = "completed";
@@ -486,14 +484,19 @@ app.get("/api/videos/:id", async (c) => {
       }
     }
   }
-  return c.json({ video });
+  return c.json({ video: publicVideo(video) });
 });
 
 app.get("/api/admin/provider-key", async (c) => {
   const profile = await requireUser(c);
   if (profile.role !== "admin") throw new HttpError(403, "需要管理员", "admin");
-  const key = await providerKey(c.env).catch(() => "");
-  return c.json({ configured: Boolean(key), hint: key ? `····${key.slice(-4)}` : "" });
+  const accounts = await loadAccounts(c.env).catch(() => [] as AgnesAccount[]);
+  const domestic = accounts.find((item) => item.site === "cn");
+  return c.json({
+    configured: accounts.length > 0,
+    hint: domestic ? `····${domestic.apiKey.slice(-4)}` : "",
+    fallback: accounts.some((item) => item.site === "intl"),
+  });
 });
 
 app.post("/api/admin/provider-key", async (c) => {
@@ -639,13 +642,34 @@ async function loadPlans(env: Env): Promise<Plan[]> {
   return db.get<Plan>("plans?select=*&order=price_cents.asc");
 }
 
-async function providerKey(env: Env): Promise<string> {
-  const fromCloudflare = env.AGNES_API_KEY?.trim() ?? "";
-  if (fromCloudflare.length >= 16) return fromCloudflare;
-  const db = createDb(env);
-  const rows = await db.get<{ api_key: string }>("provider_secrets?provider=eq.agnes&select=api_key");
-  if (!rows[0]?.api_key) throw new HttpError(502, "还没有配置 Agnes 密钥", "key");
-  return rows[0].api_key;
+async function loadAccounts(env: Env): Promise<AgnesAccount[]> {
+  const accounts: AgnesAccount[] = [];
+  let domestic = env.AGNES_API_KEY?.trim() ?? "";
+  if (domestic.length < 16) {
+    const db = createDb(env);
+    const rows = await db.get<{ api_key: string }>("provider_secrets?provider=eq.agnes&select=api_key");
+    domestic = rows[0]?.api_key?.trim() ?? "";
+  }
+  if (domestic.length >= 16) accounts.push({ site: "cn", apiKey: domestic });
+  const abroad = env.AGNES_API_KEY_2?.trim() ?? "";
+  if (abroad.length >= 16) accounts.push({ site: "intl", apiKey: abroad });
+  if (accounts.length === 0) throw new HttpError(502, "还没有配置 Agnes 密钥", "key");
+  return accounts;
+}
+
+type VideoRow = {
+  id: string;
+  upstream?: string | null;
+  provider_video_id?: string | null;
+  status: string;
+  url?: string | null;
+  error?: string | null;
+};
+
+function publicVideo<T extends { upstream?: string | null }>(video: T): Omit<T, "upstream"> {
+  const { upstream, ...rest } = video;
+  void upstream;
+  return rest;
 }
 
 async function reserveQuota(env: Env, userId: string, kind: UsageKind, limit: number): Promise<void> {
