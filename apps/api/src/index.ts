@@ -26,7 +26,14 @@ app.use("/api/*", async (c, next) => {
   const length = Number(c.req.header("content-length") ?? 0);
   if (length > 100_000) throw new HttpError(413, "请求过大", "body");
   const middleware = cors({
-    origin: c.env.APP_ORIGIN,
+    origin: (origin) => {
+      const allowed = new Set([
+        c.env.APP_ORIGIN,
+        "https://www.oranook.com",
+        "https://huijian.851615943.workers.dev",
+      ]);
+      return allowed.has(origin) ? origin : null;
+    },
     allowHeaders: ["Authorization", "Content-Type", "X-Payment-Secret"],
     allowMethods: ["GET", "POST", "OPTIONS"],
   });
