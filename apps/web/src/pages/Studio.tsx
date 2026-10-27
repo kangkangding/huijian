@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { api, type ImageItem } from "../api";
+import { DownloadButton } from "../components/DownloadButton";
 import { NeedLogin, useAuth } from "../auth";
 
 const ratios = [
@@ -107,6 +108,7 @@ function StudioBody() {
       </div>
       <div className="stage">
         {current?.url ? <img src={current.url} alt={current.prompt} /> : <div className="empty">生成结果会停在这里。</div>}
+        {current?.url && <DownloadButton path={`/api/images/${current.id}/file`} name="huijian-image" />}
         {current && <p>{current.prompt}</p>}
         <div className="thumbs">
           {images.filter((item) => item.url).slice(0, 8).map((item) => (

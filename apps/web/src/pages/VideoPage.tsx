@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { api, type VideoItem } from "../api";
+import { DownloadButton } from "../components/DownloadButton";
 import { NeedLogin, useAuth } from "../auth";
 
 const ratios = ["16:9", "9:16", "1:1", "3:4", "4:3"];
@@ -105,6 +106,7 @@ function VideoBody() {
       </div>
       <div className="stage">
         {current?.url && <video src={current.url} controls />}
+        {current?.url && <DownloadButton path={`/api/videos/${current.id}/file`} name="huijian-video" />}
         {!current?.url && <div className="empty">{current?.status === "processing" ? "视频还在生成，每两秒看一次。" : current?.error || "视频会停在这里。"}</div>}
         <ul className="plain">
           {videos.map((item) => (

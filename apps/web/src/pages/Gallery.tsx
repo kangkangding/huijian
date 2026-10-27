@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { api, type ImageItem, type VideoItem } from "../api";
+import { DownloadButton } from "../components/DownloadButton";
 import { NeedLogin } from "../auth";
 
 export function Gallery() {
@@ -33,12 +34,14 @@ function GalleryBody() {
           <figure key={item.id}>
             <img src={item.url ?? ""} alt={item.prompt} />
             <figcaption>{item.prompt}</figcaption>
+            <DownloadButton path={`/api/images/${item.id}/file`} name="huijian-image" />
           </figure>
         ))}
         {clips.map((item) => (
           <figure key={item.id}>
             <video src={item.url ?? ""} controls />
             <figcaption>{item.prompt}</figcaption>
+            <DownloadButton path={`/api/videos/${item.id}/file`} name="huijian-video" />
           </figure>
         ))}
       </div>

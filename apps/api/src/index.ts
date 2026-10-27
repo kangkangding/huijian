@@ -3,6 +3,7 @@ import { cors } from "hono/cors";
 import { createChat, createImage, createVideo, IMAGE_MODEL, pollVideo, UpstreamError, VIDEO_MODEL, type AgnesAccount, type AgnesSite } from "./agnes";
 import { amountCents, createWapPayUrl, queryTrade, verifyNotify } from "./alipay";
 import { createDb, DbError, isMissingSchema } from "./db";
+import { downloadTarget, mediaExtension } from "./download";
 import { HttpError, readJson, type Vars } from "./http";
 import { sendPasswordReset, sendVerification } from "./mail";
 import { hashPassword, randomToken, secretsMatch, sha256Hex, verifyPassword } from "./password";
@@ -349,6 +350,15 @@ app.get("/api/images", async (c) => {
   return c.json({ images });
 });
 
+app.get("/api/images/:id/file", async (c) => {
+  const profile = await requireUser(c);
+  const id = c.req.param("id");
+  if (!isUuid(id)) throw new HttpError(404, "找不到图片", "download");
+  const db = createDb(c.env);
+  const rows = await db.get<{ url: string | null }>(`images?id=eq.${id}&user_id=eq.${profile.id}&select=url`);
+  return sendFile(rows[0]?.url, "huijian-image");
+});
+
 app.post("/api/chat", async (c) => {
   const profile = await requireUser(c);
   const body = await readJson<{ conversationId?: string; message?: string }>(c);
@@ -452,6 +462,15 @@ app.get("/api/videos", async (c) => {
   return c.json({ videos });
 });
 
+app.get("/api/videos/:id/file", async (c) => {
+  const profile = await requireUser(c);
+  const id = c.req.param("id");
+  if (!isUuid(id)) throw new HttpError(404, "找不到视频", "download");
+  const db = createDb(c.env);
+  const rows = await db.get<{ url: string | null }>(`videos?id=eq.${id}&user_id=eq.${profile.id}&select=url`);
+  return sendFile(rows[0]?.url, "huijian-video");
+});
+
 app.get("/api/videos/:id", async (c) => {
   const profile = await requireUser(c);
   const db = createDb(c.env);
@@ -535,6 +554,28 @@ async function requireUser(c: { env: Env; req: { header: (name: string) => strin
 }
 
 type PaidOrder = { id: string; user_id: string; plan_code: string; status: string; amount_cents: number };
+
+async function sendFile(raw: string | null | undefined, name: string): Promise<Response> {
+  const target = downloadTarget(raw);
+  if (!target) throw new HttpError(404, "还没有可下载的文件", "download");
+  let upstream: Response;
+  try {
+    upstream = await fetch(target, { redirect: "follow" });
+  } catch {
+    throw new HttpError(502, "文件暂时下不来", "download");
+  }
+  const extension = mediaExtension(upstream.headers.get("content-type") ?? "");
+  const finalTarget = downloadTarget(upstream.url || target.toString());
+  if (!upstream.ok || !upstream.body || !extension || !finalTarget) throw new HttpError(502, "文件暂时下不来", "download");
+  const headers = new Headers();
+  headers.set("Content-Type", extension === "jpg" ? "image/jpeg" : extension === "png" ? "image/png" : extension === "webp" ? "image/webp" : extension === "gif" ? "image/gif" : extension === "mp4" ? "video/mp4" : extension === "webm" ? "video/webm" : "video/quicktime");
+  headers.set("Content-Disposition", `attachment; filename="${name}.${extension}"`);
+  const length = upstream.headers.get("content-length") ?? "";
+  if (/^\d+$/.test(length)) headers.set("Content-Length", length);
+  headers.set("Cache-Control", "private, max-age=300");
+  console.log(JSON.stringify({ event: "download", name, status: upstream.status }));
+  return new Response(upstream.body, { status: 200, headers });
+}
 
 function isUuid(value: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);

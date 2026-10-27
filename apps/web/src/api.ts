@@ -29,6 +29,35 @@ export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
   return data as T;
 }
 
+export async function downloadFile(path: string, name: string): Promise<void> {
+  const headers = new Headers();
+  const token = tokenStore.get();
+  if (token) headers.set("Authorization", `Bearer ${token}`);
+  const response = await fetch(`${base}${path}`, { headers });
+  if (!response.ok) {
+    const data = (await response.json().catch(() => ({}))) as { error?: string };
+    throw new Error(data.error || "下载失败");
+  }
+  const blob = await response.blob();
+  const type = blob.type || "";
+  const extension = type.includes("jpeg") ? "jpg"
+    : type.includes("png") ? "png"
+    : type.includes("webp") ? "webp"
+    : type.includes("gif") ? "gif"
+    : type.includes("mp4") ? "mp4"
+    : type.includes("webm") ? "webm"
+    : type.includes("quicktime") ? "mov"
+    : "bin";
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `${name}.${extension}`;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
+
 export function yuan(cents: number): string {
   const value = cents / 100;
   if (Number.isInteger(value)) return String(value);
