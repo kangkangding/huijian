@@ -52,7 +52,7 @@ export function Shell() {
       </main>
       <footer className="foot">
         <span>绘简</span>
-        <span>图片、问答和视频经 Agnes 会员接口转发。请勿生成侵权或违法内容。</span>
+        <span>请勿生成侵权或违法内容。</span>
       </footer>
     </div>
   );
