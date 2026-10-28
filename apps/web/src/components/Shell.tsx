@@ -57,8 +57,9 @@ export function Shell() {
           <a href={`mailto:${supportEmail}`}>{supportEmail}</a>
           <Link to="/privacy">隐私政策</Link>
           <Link to="/terms">使用条款</Link>
+          <Link to="/acceptable-use">使用规范</Link>
         </div>
-        <span>请勿生成侵权或违法内容。</span>
+        <span>请勿生成侵权、违法或色情内容。</span>
       </footer>
     </div>
   );

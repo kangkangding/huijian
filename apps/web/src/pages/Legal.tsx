@@ -25,7 +25,7 @@ export function Privacy() {
       <h2>你的选择</h2>
       <p>可以退出登录。如果要删除账号和相关记录，请发邮件给我们，并注明注册邮箱。</p>
       <p>联系邮箱：<a href={`mailto:${supportEmail}`}>{supportEmail}</a></p>
-      <p><Link to="/terms">使用条款</Link></p>
+      <p><Link to="/terms">使用条款</Link> · <Link to="/acceptable-use">使用规范</Link></p>
     </article>
   );
 }
@@ -42,7 +42,7 @@ export function Terms() {
       <p>请使用真实可达的邮箱注册，并保管自己的密码。一个账号的额度和会员只供该账号使用。</p>
 
       <h2>可以做什么，不可以做什么</h2>
-      <p>可以用绘简为自己的商品、作业和创作准备画面。不要生成或传播侵权、违法、欺诈或侵害他人的内容。我们会拒绝这类请求，并可以暂停相关账号。</p>
+      <p>可以用绘简为自己的商品、作业和创作准备画面。禁止生成或传播侵权、违法、欺诈或侵害他人的内容，也禁止色情、露骨、性暗示内容，以及针对未成年人的性内容。暴力伤害、诈骗、深度伪造和换脸同样禁止。我们会拒绝这类请求，并可以暂停相关账号。具体边界见<Link to="/acceptable-use">使用规范</Link>。</p>
       <p>生成结果由你自行判断能否使用。绘简不保证画面里的文字、商标或人物可以商用。</p>
 
       <h2>会员和付款</h2>
@@ -54,7 +54,32 @@ export function Terms() {
 
       <h2>联系</h2>
       <p>问题、退款和账号删除请发邮件到 <a href={`mailto:${supportEmail}`}>{supportEmail}</a>。</p>
-      <p><Link to="/privacy">隐私政策</Link></p>
+      <p><Link to="/privacy">隐私政策</Link> · <Link to="/acceptable-use">使用规范</Link></p>
+    </article>
+  );
+}
+
+export function AcceptableUse() {
+  return (
+    <article className="legal">
+      <p className="eyebrow">绘简</p>
+      <h1>使用规范</h1>
+      <p className="quiet">生效日期：2026年10月29日</p>
+      <p>绘简（oranook.com）只用于为自己的商品、作业和创作准备画面、问答和短视频。使用本服务即表示你遵守本规范。</p>
+
+      <h2>禁止的内容</h2>
+      <p>不要提交、生成或传播以下内容：</p>
+      <p>色情、露骨、性暗示，以及任何针对未成年人的性内容。</p>
+      <p>侵权、冒充他人、欺诈、诈骗，以及侵害他人隐私或名誉的内容。</p>
+      <p>违法内容，包括暴力伤害、仇恨、危险行为教学。</p>
+      <p>深度伪造、换脸，以及把真实的人做成误导性画面或视频。</p>
+
+      <h2>我们会怎么处理</h2>
+      <p>这类请求会被拒绝，不生成结果。反复尝试或传播禁止内容的账号可以被暂停。已经生成的记录也可以删除。</p>
+
+      <h2>联系</h2>
+      <p>发现违规内容，或需要说明一次被拒绝的请求，请发邮件到 <a href={`mailto:${supportEmail}`}>{supportEmail}</a>。</p>
+      <p><Link to="/terms">使用条款</Link> · <Link to="/privacy">隐私政策</Link></p>
     </article>
   );
 }
