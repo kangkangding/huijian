@@ -147,9 +147,26 @@ label { display: grid; gap: 6px; margin: 12px 0; font-size: 14px; }
 .gallery figure { margin: 0; }
 .gallery figcaption { color: var(--muted); font-size: 13px; margin-top: 6px; }
 .plain { padding-left: 18px; }
-.meters { display: grid; gap: 10px; max-width: 420px; }
-.meters div { display: grid; gap: 4px; }
-.meters i { display: block; height: 8px; border-radius: 99px; background: var(--persimmon); }
+.account h2 { margin-top: 42px; }
+.meters { display: grid; gap: 14px; max-width: 420px; margin: 22px 0 8px; }
+.meters div { display: grid; gap: 6px; }
+.meters span { display: flex; justify-content: space-between; font-size: 14px; }
+.meters em { font-style: normal; color: var(--muted); }
+.meters .track { display: block; height: 8px; border-radius: 99px; background: var(--line); overflow: hidden; }
+.meters i { display: block; height: 100%; border-radius: 99px; background: var(--persimmon); }
+.orders { list-style: none; padding: 0; margin: 8px 0 0; display: grid; gap: 10px; }
+.orders li {
+  display: flex; justify-content: space-between; align-items: center; gap: 16px;
+  background: var(--cream); border: 1px solid var(--line); border-radius: 18px; padding: 14px 16px;
+}
+.order-main { display: grid; gap: 2px; min-width: 0; }
+.order-main strong { font-family: var(--display); font-size: 22px; font-weight: 560; }
+.order-main span { color: var(--muted); font-size: 13px; }
+.order-side { display: flex; align-items: center; justify-content: flex-end; gap: 14px; flex-wrap: wrap; }
+.order-actions { display: flex; align-items: center; gap: 10px; }
+.status { font-size: 12px; border-radius: 999px; padding: 3px 10px; background: var(--line); color: var(--muted); }
+.status.pending { background: #f8e4d4; color: var(--deep); }
+.status.paid { background: #dce8e1; color: var(--pine); }
 
 :focus-visible { outline: 2px solid var(--persimmon); outline-offset: 3px; }
 
@@ -159,5 +176,7 @@ label { display: grid; gap: 6px; margin: 12px 0; font-size: 14px; }
   .nav nav { order: 3; flex: 1 0 100%; width: 100%; overflow: auto; }
   .nav nav a { white-space: nowrap; }
   .offer { align-items: start; }
+  .orders li { flex-direction: column; align-items: flex-start; }
+  .order-side { justify-content: flex-start; }
   .foot { flex-direction: column; align-items: flex-start; gap: 8px; }
 }

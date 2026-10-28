@@ -16,6 +16,7 @@ function AccountBody() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [keyState, setKeyState] = useState<KeyState>({ configured: false, hint: "" });
   const [apiKey, setApiKey] = useState("");
+  const [names, setNames] = useState<Record<string, string>>({ launch: "限时会员", monthly: "月费会员" });
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
 
@@ -38,6 +39,14 @@ function AccountBody() {
     load().catch((caught) => {
       if (!cancel) setError(caught instanceof Error ? caught.message : "读取失败");
     });
+    api<{ plans: { code: string; name: string }[] }>("/api/plans")
+      .then((data) => {
+        if (cancel) return;
+        const next: Record<string, string> = {};
+        for (const plan of data.plans) next[plan.code] = plan.name;
+        setNames((current) => ({ ...current, ...next }));
+      })
+      .catch(() => undefined);
     if (session?.user.role === "admin") {
       api<KeyState>("/api/admin/provider-key").then(setKeyState).catch(() => undefined);
     }
@@ -111,13 +120,23 @@ function AccountBody() {
         <Meter label="视频" used={usage.video.used} limit={usage.video.limit} />
       </div>
       <h2>订单</h2>
-      <ul className="plain">
+      <ul className="orders">
         {orders.map((order) => (
           <li key={order.id}>
-            {order.plan_code} · {yuan(order.amount_cents)} 元 · {orderStatus(order.status)}
-            {order.status === "pending" && <button type="button" className="text-btn" onClick={() => pay(order.id)}>继续支付</button>}
-            {order.status === "pending" && <button type="button" className="text-btn" onClick={() => sync(order.id)}>我已支付</button>}
-            {order.status === "pending" && <button type="button" className="text-btn" onClick={() => cancel(order.id)}>取消</button>}
+            <div className="order-main">
+              <strong>{names[order.plan_code] ?? order.plan_code}</strong>
+              <span>{yuan(order.amount_cents)} 元 · {orderTime(order.created_at)}</span>
+            </div>
+            <div className="order-side">
+              <span className={`status ${order.status}`}>{orderStatus(order.status)}</span>
+              {order.status === "pending" && (
+                <div className="order-actions">
+                  <button type="button" className="btn small" onClick={() => pay(order.id)}>继续支付</button>
+                  <button type="button" className="btn small ghost" onClick={() => sync(order.id)}>我已支付</button>
+                  <button type="button" className="text-btn" onClick={() => cancel(order.id)}>取消</button>
+                </div>
+              )}
+            </div>
           </li>
         ))}
       </ul>
@@ -145,12 +164,25 @@ function orderStatus(status: string): string {
   return status;
 }
 
+function orderTime(value: string): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return new Intl.DateTimeFormat("zh-CN", {
+    timeZone: "Asia/Shanghai",
+    month: "numeric",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).format(date);
+}
+
 function Meter({ label, used, limit }: { label: string; used: number; limit: number }) {
   const width = limit === 0 ? 0 : Math.min(100, Math.round((used / limit) * 100));
   return (
     <div>
-      <span>{label} {used}/{limit}</span>
-      <i style={{ width: `${width}%` }} />
+      <span>{label}<em>{limit === 0 ? "未开通" : `${used}/${limit}`}</em></span>
+      <b className="track"><i style={{ width: `${width}%` }} /></b>
     </div>
   );
 }
