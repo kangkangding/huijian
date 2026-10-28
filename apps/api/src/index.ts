@@ -218,10 +218,42 @@ app.get("/api/membership/orders", async (c) => {
   return c.json({ orders });
 });
 
-app.post("/api/membership/orders/:id/pay", async (c) => {
+app.post("/api/membership/orders/:id/cancel", async (c) => {
   const profile = await requireUser(c);
   const order = await loadOwnedOrder(c.env, c.req.param("id"), profile.id);
   if (order.status !== "pending") throw new HttpError(409, "订单已处理", "order");
+  const updated = await createDb(c.env).patch<{ id: string }>(
+    `orders?id=eq.${order.id}&status=eq.pending`,
+    { status: "cancelled" },
+  );
+  if (updated.length === 0) throw new HttpError(409, "订单已处理", "order");
+  return c.json({ ok: true });
+});
+
+app.post("/api/membership/orders/:id/pay", async (c) => {
+  const profile = await requireUser(c);
+  const db = createDb(c.env);
+  let order = await loadOwnedOrder(c.env, c.req.param("id"), profile.id);
+  if (order.status !== "pending") throw new HttpError(409, "订单已处理", "order");
+  let replacedId = "";
+  if (order.checkout_at) {
+    const rows = await db.post<{ id: string; amount_cents: number; status: string; plan_code: string }>("orders", {
+      user_id: profile.id,
+      plan_code: order.plan_code,
+      amount_cents: order.amount_cents,
+      status: "pending",
+    });
+    const created = rows[0];
+    if (!created) throw new HttpError(502, "订单没有建成", "order");
+    replacedId = order.id;
+    order = {
+      id: created.id,
+      user_id: profile.id,
+      plan_code: created.plan_code,
+      status: "pending",
+      amount_cents: created.amount_cents,
+    };
+  }
   const plans = await loadPlans(c.env);
   const plan = plans.find((item) => item.code === order.plan_code);
   const origin = c.env.APP_ORIGIN.replace(/\/$/, "");
@@ -237,8 +269,15 @@ app.post("/api/membership/orders/:id/pay", async (c) => {
     };
     const mobile = prefersMobilePay(c.req.header("user-agent") ?? "");
     const payUrl = mobile ? await createWapPayUrl(payInput) : await createPagePayUrl(payInput);
+    await db.patch(`orders?id=eq.${order.id}&status=eq.pending`, { checkout_at: new Date().toISOString() });
+    if (replacedId) {
+      await db.patch(`orders?id=eq.${replacedId}&status=eq.pending`, { status: "cancelled" });
+    }
     return c.json({ payUrl });
   } catch (error) {
+    if (replacedId) {
+      await db.patch(`orders?id=eq.${order.id}&status=eq.pending`, { status: "cancelled" }).catch(() => undefined);
+    }
     if (error instanceof HttpError) throw error;
     console.log(JSON.stringify({ event: "alipay.sign", message: error instanceof Error ? error.message : "unknown" }));
     throw new HttpError(502, "支付宝暂时不可用", "payment");
@@ -281,7 +320,7 @@ app.post("/api/payments/alipay/notify", async (c) => {
   const order = rows[0];
   if (!order || order.amount_cents !== cents) return c.text("failure");
   try {
-    if (order.status === "pending") await markOrderPaid(c.env, order);
+    if (order.status === "pending" || order.status === "cancelled") await markOrderPaid(c.env, order);
   } catch (error) {
     console.log(JSON.stringify({ event: "alipay.notify", message: error instanceof Error ? error.message : "unknown" }));
     return c.text("failure");
@@ -555,7 +594,7 @@ async function requireUser(c: { env: Env; req: { header: (name: string) => strin
   return rows[0];
 }
 
-type PaidOrder = { id: string; user_id: string; plan_code: string; status: string; amount_cents: number };
+type PaidOrder = { id: string; user_id: string; plan_code: string; status: string; amount_cents: number; checkout_at?: string | null };
 
 async function sendFile(raw: string | null | undefined, name: string): Promise<Response> {
   const target = downloadTarget(raw);
@@ -600,7 +639,7 @@ function alipayConfig(env: Env): { appId: string; privateKey: string; publicKey:
 async function loadOwnedOrder(env: Env, orderId: string, userId: string): Promise<PaidOrder> {
   if (!isUuid(orderId)) throw new HttpError(404, "找不到订单", "order");
   const rows = await createDb(env).get<PaidOrder>(
-    `orders?id=eq.${orderId}&user_id=eq.${userId}&select=id,user_id,plan_code,status,amount_cents`,
+    `orders?id=eq.${orderId}&user_id=eq.${userId}&select=id,user_id,plan_code,status,amount_cents,checkout_at`,
   );
   if (!rows[0]) throw new HttpError(404, "找不到订单", "order");
   return rows[0];
@@ -608,12 +647,12 @@ async function loadOwnedOrder(env: Env, orderId: string, userId: string): Promis
 
 async function markOrderPaid(env: Env, order: PaidOrder): Promise<Profile> {
   const db = createDb(env);
-  if (order.status === "pending") {
+  if (order.status === "pending" || order.status === "cancelled") {
     const plans = await loadPlans(env);
     const plan = plans.find((item) => item.code === order.plan_code);
     if (!plan) throw new HttpError(400, "方案已下架", "plan");
     const updated = await db.patch<{ id: string }>(
-      `orders?id=eq.${order.id}&status=eq.pending`,
+      `orders?id=eq.${order.id}&status=eq.${order.status}`,
       { status: "paid", paid_at: new Date().toISOString() },
     );
     if (updated.length > 0) {

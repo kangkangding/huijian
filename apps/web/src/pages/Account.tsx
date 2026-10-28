@@ -72,6 +72,17 @@ function AccountBody() {
     }
   }
 
+  async function cancel(id: string) {
+    setError("");
+    try {
+      await api(`/api/membership/orders/${id}/cancel`, { method: "POST" });
+      setOrders((current) => current.map((order) => (order.id === id ? { ...order, status: "cancelled" } : order)));
+      setMessage("订单已取消");
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "取消失败");
+    }
+  }
+
   async function sync(id: string) {
     setError("");
     try {
@@ -103,9 +114,10 @@ function AccountBody() {
       <ul className="plain">
         {orders.map((order) => (
           <li key={order.id}>
-            {order.plan_code} · {yuan(order.amount_cents)} 元 · {order.status === "paid" ? "已支付" : order.status === "pending" ? "待支付" : order.status}
+            {order.plan_code} · {yuan(order.amount_cents)} 元 · {orderStatus(order.status)}
             {order.status === "pending" && <button type="button" className="text-btn" onClick={() => pay(order.id)}>继续支付</button>}
             {order.status === "pending" && <button type="button" className="text-btn" onClick={() => sync(order.id)}>我已支付</button>}
+            {order.status === "pending" && <button type="button" className="text-btn" onClick={() => cancel(order.id)}>取消</button>}
           </li>
         ))}
       </ul>
@@ -124,6 +136,13 @@ function AccountBody() {
       {error && <p className="error">{error}</p>}
     </section>
   );
+}
+
+function orderStatus(status: string): string {
+  if (status === "paid") return "已支付";
+  if (status === "pending") return "待支付";
+  if (status === "cancelled") return "已取消";
+  return status;
 }
 
 function Meter({ label, used, limit }: { label: string; used: number; limit: number }) {
