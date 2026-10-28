@@ -58,7 +58,7 @@ npx wrangler deploy
 
 ```bash
 cd apps/web
-VITE_API_BASE=https://huijian-api.<account>.workers.dev npm run build
+VITE_API_BASE=https://api.oranook.com npm run build
 npx wrangler pages deploy dist --project-name huijian
 ```
 

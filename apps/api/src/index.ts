@@ -228,7 +228,7 @@ app.post("/api/membership/orders/:id/pay", async (c) => {
   try {
     const payUrl = await createWapPayUrl({
       ...alipayConfig(c.env),
-      notifyUrl: "https://huijian-api.851615943.workers.dev/api/payments/alipay/notify",
+      notifyUrl: "https://api.oranook.com/api/payments/alipay/notify",
       returnUrl: `${origin}/account?paid=1`,
       quitUrl: `${origin}/pricing`,
       orderId: order.id,

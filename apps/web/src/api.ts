@@ -23,7 +23,12 @@ export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
   if (init.body && !headers.has("Content-Type")) headers.set("Content-Type", "application/json");
   const token = tokenStore.get();
   if (token) headers.set("Authorization", `Bearer ${token}`);
-  const response = await fetch(`${base}${path}`, { ...init, headers });
+  let response: Response;
+  try {
+    response = await fetch(`${base}${path}`, { ...init, headers });
+  } catch {
+    throw new ApiError("网络连不上，请换个网络再试", "network");
+  }
   const data = (await response.json().catch(() => ({}))) as { error?: string; code?: string; conversationId?: string };
   if (!response.ok) throw new ApiError(data.error || "请求失败", data.code ?? "", response.status, data.conversationId ?? "");
   return data as T;
@@ -33,7 +38,12 @@ export async function downloadFile(path: string, name: string): Promise<void> {
   const headers = new Headers();
   const token = tokenStore.get();
   if (token) headers.set("Authorization", `Bearer ${token}`);
-  const response = await fetch(`${base}${path}`, { headers });
+  let response: Response;
+  try {
+    response = await fetch(`${base}${path}`, { headers });
+  } catch {
+    throw new Error("网络连不上，请换个网络再试");
+  }
   if (!response.ok) {
     const data = (await response.json().catch(() => ({}))) as { error?: string };
     throw new Error(data.error || "下载失败");
