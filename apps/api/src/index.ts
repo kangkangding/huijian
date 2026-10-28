@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { createChat, createImage, createVideo, IMAGE_MODEL, pollVideo, UpstreamError, VIDEO_MODEL, type AgnesAccount, type AgnesSite } from "./agnes";
-import { amountCents, createWapPayUrl, queryTrade, verifyNotify } from "./alipay";
+import { amountCents, createPagePayUrl, createWapPayUrl, prefersMobilePay, queryTrade, verifyNotify } from "./alipay";
 import { createDb, DbError, isMissingSchema } from "./db";
 import { downloadTarget, mediaExtension } from "./download";
 import { HttpError, readJson, type Vars } from "./http";
@@ -226,7 +226,7 @@ app.post("/api/membership/orders/:id/pay", async (c) => {
   const plan = plans.find((item) => item.code === order.plan_code);
   const origin = c.env.APP_ORIGIN.replace(/\/$/, "");
   try {
-    const payUrl = await createWapPayUrl({
+    const payInput = {
       ...alipayConfig(c.env),
       notifyUrl: "https://api.oranook.com/api/payments/alipay/notify",
       returnUrl: `${origin}/account?paid=1`,
@@ -234,7 +234,9 @@ app.post("/api/membership/orders/:id/pay", async (c) => {
       orderId: order.id,
       amountCents: order.amount_cents,
       subject: `绘简${plan?.name ?? "会员"}`,
-    });
+    };
+    const mobile = prefersMobilePay(c.req.header("user-agent") ?? "");
+    const payUrl = mobile ? await createWapPayUrl(payInput) : await createPagePayUrl(payInput);
     return c.json({ payUrl });
   } catch (error) {
     if (error instanceof HttpError) throw error;

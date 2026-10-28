@@ -64,7 +64,11 @@ export function extractResponseNode(body: string, key: string): string | null {
   return null;
 }
 
-export async function createWapPayUrl(input: {
+export function prefersMobilePay(userAgent: string): boolean {
+  return /Android|iPhone|iPod|Mobile/i.test(userAgent) && !/iPad/i.test(userAgent);
+}
+
+async function createPayUrl(method: string, productCode: string, input: {
   appId: string;
   privateKey: string;
   notifyUrl: string;
@@ -74,9 +78,17 @@ export async function createWapPayUrl(input: {
   amountCents: number;
   subject: string;
 }): Promise<string> {
+  const biz: Record<string, string> = {
+    out_trade_no: input.orderId,
+    total_amount: yuanText(input.amountCents),
+    subject: input.subject,
+    product_code: productCode,
+    timeout_express: "30m",
+  };
+  if (method === "alipay.trade.wap.pay") biz.quit_url = input.quitUrl;
   const params: Record<string, string> = {
     app_id: input.appId,
-    method: "alipay.trade.wap.pay",
+    method,
     format: "JSON",
     charset: "utf-8",
     sign_type: "RSA2",
@@ -84,17 +96,36 @@ export async function createWapPayUrl(input: {
     version: "1.0",
     notify_url: input.notifyUrl,
     return_url: input.returnUrl,
-    biz_content: JSON.stringify({
-      out_trade_no: input.orderId,
-      total_amount: yuanText(input.amountCents),
-      subject: input.subject,
-      product_code: "QUICK_WAP_WAY",
-      timeout_express: "30m",
-      quit_url: input.quitUrl,
-    }),
+    biz_content: JSON.stringify(biz),
   };
   params.sign = await signContent(input.privateKey, buildSignString(params));
   return `${GATEWAY}?${new URLSearchParams(params)}`;
+}
+
+export function createWapPayUrl(input: {
+  appId: string;
+  privateKey: string;
+  notifyUrl: string;
+  returnUrl: string;
+  quitUrl: string;
+  orderId: string;
+  amountCents: number;
+  subject: string;
+}): Promise<string> {
+  return createPayUrl("alipay.trade.wap.pay", "QUICK_WAP_WAY", input);
+}
+
+export function createPagePayUrl(input: {
+  appId: string;
+  privateKey: string;
+  notifyUrl: string;
+  returnUrl: string;
+  quitUrl: string;
+  orderId: string;
+  amountCents: number;
+  subject: string;
+}): Promise<string> {
+  return createPayUrl("alipay.trade.page.pay", "FAST_INSTANT_TRADE_PAY", input);
 }
 
 export async function verifyNotify(publicKey: string, params: Record<string, string>): Promise<boolean> {

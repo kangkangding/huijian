@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { amountCents, buildSignString, extractResponseNode, yuanText } from "../src/alipay.ts";
+import { amountCents, buildSignString, extractResponseNode, prefersMobilePay, yuanText } from "../src/alipay.ts";
 
 test("membership prices use two decimal yuan", () => {
   assert.equal(yuanText(190), "1.90");
@@ -27,6 +27,12 @@ test("notify sign string also drops sign_type", () => {
     total_amount: "1.90",
   }, true);
   assert.equal(content, "out_trade_no=order&total_amount=1.90");
+});
+
+test("phones use the app checkout and computers use the web checkout", () => {
+  assert.equal(prefersMobilePay("Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)"), true);
+  assert.equal(prefersMobilePay("Mozilla/5.0 (Linux; Android 14; Pixel 7)"), true);
+  assert.equal(prefersMobilePay("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36"), false);
 });
 
 test("response node keeps the original json text", () => {

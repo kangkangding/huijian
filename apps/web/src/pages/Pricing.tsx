@@ -39,7 +39,7 @@ export function Pricing() {
     <section>
       <p className="eyebrow">会员</p>
       <h1>先免费试，需要时再开通。</h1>
-      <p className="lede">月费 9.9 元。限时方案 1.9 元，同样 30 天。开通后跳转支付宝，付款成功才会开通会员。</p>
+      <p className="lede">月费 9.9 元。限时方案 1.9 元，同样 30 天。电脑打开支付宝网页收银台，手机打开支付宝 App。付款成功才会开通会员。</p>
       <div className="cards pricing">
         {visible.map((plan) => (
           <article key={plan.code} className={plan.promo ? "featured" : ""}>
