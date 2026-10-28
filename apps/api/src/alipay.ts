@@ -68,7 +68,18 @@ export function prefersMobilePay(userAgent: string): boolean {
   return /Android|iPhone|iPod|Mobile/i.test(userAgent) && !/iPad/i.test(userAgent);
 }
 
-async function createPayUrl(method: string, productCode: string, input: {
+export function alipayOrderNo(): string {
+  const bytes = crypto.getRandomValues(new Uint8Array(16));
+  let hex = "";
+  for (const byte of bytes) hex += byte.toString(16).padStart(2, "0");
+  return `hj${hex}`;
+}
+
+export function isAlipayOrderNo(value: string): boolean {
+  return /^hj[0-9a-f]{32}$/.test(value);
+}
+
+async function createPayFields(method: string, productCode: string, input: {
   appId: string;
   privateKey: string;
   notifyUrl: string;
@@ -77,7 +88,7 @@ async function createPayUrl(method: string, productCode: string, input: {
   orderId: string;
   amountCents: number;
   subject: string;
-}): Promise<string> {
+}): Promise<Record<string, string>> {
   const biz: Record<string, string> = {
     out_trade_no: input.orderId,
     total_amount: yuanText(input.amountCents),
@@ -99,10 +110,12 @@ async function createPayUrl(method: string, productCode: string, input: {
     biz_content: JSON.stringify(biz),
   };
   params.sign = await signContent(input.privateKey, buildSignString(params));
-  return `${GATEWAY}?${new URLSearchParams(params)}`;
+  return params;
 }
 
-export function createWapPayUrl(input: {
+export const ALIPAY_GATEWAY = GATEWAY;
+
+export function createWapPayFields(input: {
   appId: string;
   privateKey: string;
   notifyUrl: string;
@@ -111,11 +124,11 @@ export function createWapPayUrl(input: {
   orderId: string;
   amountCents: number;
   subject: string;
-}): Promise<string> {
-  return createPayUrl("alipay.trade.wap.pay", "QUICK_WAP_WAY", input);
+}): Promise<Record<string, string>> {
+  return createPayFields("alipay.trade.wap.pay", "QUICK_WAP_WAY", input);
 }
 
-export function createPagePayUrl(input: {
+export function createPagePayFields(input: {
   appId: string;
   privateKey: string;
   notifyUrl: string;
@@ -124,8 +137,8 @@ export function createPagePayUrl(input: {
   orderId: string;
   amountCents: number;
   subject: string;
-}): Promise<string> {
-  return createPayUrl("alipay.trade.page.pay", "FAST_INSTANT_TRADE_PAY", input);
+}): Promise<Record<string, string>> {
+  return createPayFields("alipay.trade.page.pay", "FAST_INSTANT_TRADE_PAY", input);
 }
 
 export async function verifyNotify(publicKey: string, params: Record<string, string>): Promise<boolean> {

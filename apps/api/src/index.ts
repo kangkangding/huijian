@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { createChat, createImage, createVideo, IMAGE_MODEL, pollVideo, UpstreamError, VIDEO_MODEL, type AgnesAccount, type AgnesSite } from "./agnes";
-import { amountCents, createPagePayUrl, createWapPayUrl, prefersMobilePay, queryTrade, verifyNotify } from "./alipay";
+import { ALIPAY_GATEWAY, amountCents, alipayOrderNo, createPagePayFields, createWapPayFields, isAlipayOrderNo, prefersMobilePay, queryTrade, verifyNotify } from "./alipay";
 import { createDb, DbError, isMissingSchema } from "./db";
 import { downloadTarget, mediaExtension } from "./download";
 import { HttpError, readJson, type Vars } from "./http";
@@ -257,23 +257,24 @@ app.post("/api/membership/orders/:id/pay", async (c) => {
   const plans = await loadPlans(c.env);
   const plan = plans.find((item) => item.code === order.plan_code);
   const origin = c.env.APP_ORIGIN.replace(/\/$/, "");
+  const tradeNo = alipayOrderNo();
   try {
     const payInput = {
       ...alipayConfig(c.env),
       notifyUrl: "https://api.oranook.com/api/payments/alipay/notify",
-      returnUrl: `${origin}/account?paid=1`,
+      returnUrl: `${origin}/account`,
       quitUrl: `${origin}/pricing`,
-      orderId: order.id,
+      orderId: tradeNo,
       amountCents: order.amount_cents,
       subject: `绘简${plan?.name ?? "会员"}`,
     };
     const mobile = prefersMobilePay(c.req.header("user-agent") ?? "");
-    const payUrl = mobile ? await createWapPayUrl(payInput) : await createPagePayUrl(payInput);
-    await db.patch(`orders?id=eq.${order.id}&status=eq.pending`, { checkout_at: new Date().toISOString() });
+    const fields = mobile ? await createWapPayFields(payInput) : await createPagePayFields(payInput);
+    await db.patch(`orders?id=eq.${order.id}&status=eq.pending`, { out_trade_no: tradeNo, checkout_at: new Date().toISOString() });
     if (replacedId) {
       await db.patch(`orders?id=eq.${replacedId}&status=eq.pending`, { status: "cancelled" });
     }
-    return c.json({ payUrl });
+    return c.json({ fields, payUrl: `${ALIPAY_GATEWAY}?${new URLSearchParams(fields)}` });
   } catch (error) {
     if (replacedId) {
       await db.patch(`orders?id=eq.${order.id}&status=eq.pending`, { status: "cancelled" }).catch(() => undefined);
@@ -293,7 +294,7 @@ app.post("/api/membership/orders/:id/sync", async (c) => {
   }
   let result: { paid: boolean; amountCents: number | null };
   try {
-    result = await queryTrade({ ...alipayConfig(c.env), orderId: order.id });
+    result = await queryTrade({ ...alipayConfig(c.env), orderId: order.out_trade_no || order.id });
   } catch (error) {
     if (error instanceof HttpError) throw error;
     console.log(JSON.stringify({ event: "alipay.query", message: error instanceof Error ? error.message : "unknown" }));
@@ -311,12 +312,16 @@ app.post("/api/payments/alipay/notify", async (c) => {
   const verified = await verifyNotify(config.publicKey, params).catch(() => false);
   const paid = params.trade_status === "TRADE_SUCCESS" || params.trade_status === "TRADE_FINISHED";
   const cents = amountCents(params.total_amount ?? "");
-  if (!verified || params.app_id !== config.appId || !paid || cents === null || !isUuid(params.out_trade_no ?? "")) {
+  const tradeNo = params.out_trade_no ?? "";
+  if (!verified || params.app_id !== config.appId || !paid || cents === null || (!isAlipayOrderNo(tradeNo) && !isUuid(tradeNo))) {
     console.log(JSON.stringify({ event: "alipay.notify", verified, status: params.trade_status ?? "" }));
     return c.text("failure");
   }
   const db = createDb(c.env);
-  const rows = await db.get<PaidOrder>(`orders?id=eq.${params.out_trade_no}&select=id,user_id,plan_code,status,amount_cents`);
+  const byTradeNo = await db.get<PaidOrder>(`orders?out_trade_no=eq.${encodeURIComponent(tradeNo)}&select=id,user_id,plan_code,status,amount_cents`);
+  const rows = byTradeNo[0] || !isUuid(tradeNo)
+    ? byTradeNo
+    : await db.get<PaidOrder>(`orders?id=eq.${tradeNo}&select=id,user_id,plan_code,status,amount_cents`);
   const order = rows[0];
   if (!order || order.amount_cents !== cents) return c.text("failure");
   try {
@@ -594,7 +599,7 @@ async function requireUser(c: { env: Env; req: { header: (name: string) => strin
   return rows[0];
 }
 
-type PaidOrder = { id: string; user_id: string; plan_code: string; status: string; amount_cents: number; checkout_at?: string | null };
+type PaidOrder = { id: string; user_id: string; plan_code: string; status: string; amount_cents: number; checkout_at?: string | null; out_trade_no?: string | null };
 
 async function sendFile(raw: string | null | undefined, name: string): Promise<Response> {
   const target = downloadTarget(raw);
@@ -639,7 +644,7 @@ function alipayConfig(env: Env): { appId: string; privateKey: string; publicKey:
 async function loadOwnedOrder(env: Env, orderId: string, userId: string): Promise<PaidOrder> {
   if (!isUuid(orderId)) throw new HttpError(404, "找不到订单", "order");
   const rows = await createDb(env).get<PaidOrder>(
-    `orders?id=eq.${orderId}&user_id=eq.${userId}&select=id,user_id,plan_code,status,amount_cents,checkout_at`,
+    `orders?id=eq.${orderId}&user_id=eq.${userId}&select=id,user_id,plan_code,status,amount_cents,checkout_at,out_trade_no`,
   );
   if (!rows[0]) throw new HttpError(404, "找不到订单", "order");
   return rows[0];

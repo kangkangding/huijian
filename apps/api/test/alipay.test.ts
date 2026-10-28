@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { amountCents, buildSignString, extractResponseNode, prefersMobilePay, yuanText } from "../src/alipay.ts";
+import { alipayOrderNo, amountCents, buildSignString, extractResponseNode, isAlipayOrderNo, prefersMobilePay, yuanText } from "../src/alipay.ts";
 
 test("membership prices use two decimal yuan", () => {
   assert.equal(yuanText(190), "1.90");
@@ -27,6 +27,12 @@ test("notify sign string also drops sign_type", () => {
     total_amount: "1.90",
   }, true);
   assert.equal(content, "out_trade_no=order&total_amount=1.90");
+});
+
+test("alipay order numbers stay within letters and digits", () => {
+  const tradeNo = alipayOrderNo();
+  assert.equal(isAlipayOrderNo(tradeNo), true);
+  assert.equal(tradeNo.includes("-"), false);
 });
 
 test("phones use the app checkout and computers use the web checkout", () => {

@@ -1,6 +1,6 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { useSearchParams } from "react-router-dom";
-import { api, yuan } from "../api";
+import { api, redirectToAlipay, yuan } from "../api";
 import { NeedLogin, useAuth } from "../auth";
 
 type Order = { id: string; plan_code: string; amount_cents: number; status: string; created_at: string };
@@ -25,7 +25,7 @@ function AccountBody() {
     async function load() {
       const data = await api<{ orders: Order[] }>("/api/membership/orders");
       let next = data.orders;
-      if (params.get("paid") === "1") {
+      if (params.get("paid") === "1" || params.get("out_trade_no")) {
         const pendingOrders = next.filter((order) => order.status === "pending");
         if (pendingOrders.length > 0) {
           await Promise.all(pendingOrders.map((order) => api(`/api/membership/orders/${order.id}/sync`, { method: "POST" }).catch(() => undefined)));
@@ -74,8 +74,8 @@ function AccountBody() {
   async function pay(id: string) {
     setError("");
     try {
-      const data = await api<{ payUrl: string }>(`/api/membership/orders/${id}/pay`, { method: "POST" });
-      window.location.assign(data.payUrl);
+      const data = await api<{ payUrl?: string; fields?: Record<string, string> }>(`/api/membership/orders/${id}/pay`, { method: "POST" });
+      redirectToAlipay(data);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "支付失败");
     }

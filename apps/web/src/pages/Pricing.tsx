@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { api, yuan, type Plan } from "../api";
+import { api, redirectToAlipay, yuan, type Plan } from "../api";
 import { useAuth } from "../auth";
 
 type Order = { id: string; plan_code: string; amount_cents: number; status: string };
@@ -25,8 +25,8 @@ export function Pricing() {
         method: "POST",
         body: JSON.stringify({ planCode: code }),
       });
-      const pay = await api<{ payUrl: string }>(`/api/membership/orders/${data.order.id}/pay`, { method: "POST" });
-      window.location.assign(pay.payUrl);
+      const pay = await api<{ payUrl?: string; fields?: Record<string, string> }>(`/api/membership/orders/${data.order.id}/pay`, { method: "POST" });
+      redirectToAlipay(pay);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "下单失败");
       setPending("");
