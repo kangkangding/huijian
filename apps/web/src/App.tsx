@@ -6,6 +6,7 @@ import { Auth } from "./pages/Auth";
 import { Chat } from "./pages/Chat";
 import { Gallery } from "./pages/Gallery";
 import { Home } from "./pages/Home";
+import { Privacy, Terms } from "./pages/Legal";
 import { Pricing } from "./pages/Pricing";
 import { Studio } from "./pages/Studio";
 import { VideoPage } from "./pages/VideoPage";
@@ -27,6 +28,8 @@ export function App() {
             <Route path="/video" element={<VideoPage />} />
             <Route path="/gallery" element={<Gallery />} />
             <Route path="/pricing" element={<Pricing />} />
+            <Route path="/privacy" element={<Privacy />} />
+            <Route path="/terms" element={<Terms />} />
             <Route path="/account" element={<Account />} />
           </Route>
         </Routes>

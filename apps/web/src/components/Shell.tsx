@@ -1,4 +1,5 @@
-import { NavLink, Outlet, useNavigate } from "react-router-dom";
+import { Link, NavLink, Outlet, useNavigate } from "react-router-dom";
+import { supportEmail } from "../pages/Legal";
 import { api, tokenStore } from "../api";
 import { useAuth } from "../auth";
 
@@ -51,7 +52,12 @@ export function Shell() {
         <Outlet />
       </main>
       <footer className="foot">
-        <span>绘简</span>
+        <div className="foot-links">
+          <span>绘简</span>
+          <a href={`mailto:${supportEmail}`}>{supportEmail}</a>
+          <Link to="/privacy">隐私政策</Link>
+          <Link to="/terms">使用条款</Link>
+        </div>
         <span>请勿生成侵权或违法内容。</span>
       </footer>
     </div>
