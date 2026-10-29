@@ -9,6 +9,8 @@ export type Env = {
   ALIPAY_PUBLIC_KEY?: string;
   AGNES_API_KEY?: string;
   AGNES_API_KEY_2?: string;
+  CREEM_API_KEY?: string;
+  CREEM_API_BASE?: string;
   BREVO_API_KEY?: string;
   BREVO_SENDER_EMAIL?: string;
   BREVO_SENDER_NAME?: string;

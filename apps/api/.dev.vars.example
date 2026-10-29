@@ -3,3 +3,6 @@ SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 PAYMENT_WEBHOOK_SECRET=change-me
 APP_ORIGIN=http://localhost:5173
 APP_ENV=development
+# 本地沙箱审核。生产环境不要把密钥写进文件，用 wrangler secret，且必须是 creem_ 正式密钥。
+# CREEM_API_KEY=creem_test_replace_me
+# CREEM_API_BASE=https://test-api.creem.io

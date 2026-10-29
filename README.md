@@ -46,7 +46,12 @@ cd apps/api
 npx wrangler secret put SUPABASE_URL
 npx wrangler secret put SUPABASE_SERVICE_ROLE_KEY
 npx wrangler secret put PAYMENT_WEBHOOK_SECRET
+npx wrangler secret put CREEM_API_KEY
 ```
+
+`CREEM_API_KEY` 必须是 Creem 正式密钥，前缀是 `creem_`，不能是 `creem_test_`。默认请求 `https://api.creem.io`。只有本地 `APP_ENV=development` 才可以把 `CREEM_API_BASE` 设为 `https://test-api.creem.io` 并用沙箱密钥。图片和视频在扣额度、调用 Agnes 之前会先审核提示词；审核拒绝或审核服务不可用时都不会生成。聊天和视频轮询不审核。
+
+部署并确认生产请求已经打到 Creem 正式环境后，到 Creem 的 Payout Accounts 里对这个账号点 Request re-review。
 
 把 `wrangler.jsonc` 里的 `APP_ORIGIN` 改成 Pages 域名，`APP_ENV` 保持 `production`，然后：
 
@@ -69,9 +74,9 @@ npx wrangler pages deploy dist --project-name huijian
 - `POST /api/auth/register` `POST /api/auth/login` `POST /api/auth/logout` `GET /api/auth/me`
 - `POST /api/auth/forgot-password` `POST /api/auth/reset-password`
 - `GET /api/plans` `POST /api/membership/orders` `POST /api/membership/orders/:id/confirm`
-- `POST /api/images` `GET /api/images`
+- `POST /api/images`（先 `POST /v1/moderation/prompt`）`GET /api/images`
 - `POST /api/chat` `GET /api/chat/conversations` `GET /api/chat/conversations/:id`
-- `POST /api/videos` `GET /api/videos` `GET /api/videos/:id`
+- `POST /api/videos`（先 `POST /v1/moderation/prompt`）`GET /api/videos` `GET /api/videos/:id`
 - `GET /api/admin/provider-key` `POST /api/admin/provider-key`
 
 上游地址固定为 Agnes 中国站：聊天 `agnes-2.5-flash`，图片 `agnes-image-2.5-flash`，视频 `agnes-video-2.5-flash`。

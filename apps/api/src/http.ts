@@ -4,7 +4,7 @@ export type Vars = { user: Profile };
 
 export class HttpError extends Error {
   constructor(
-    public status: 400 | 401 | 402 | 403 | 404 | 409 | 413 | 429 | 502,
+    public status: 400 | 401 | 402 | 403 | 404 | 409 | 413 | 429 | 502 | 503,
     message: string,
     public code: string,
     public details: Record<string, unknown> = {},

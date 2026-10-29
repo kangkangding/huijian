@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { createChat, createImage, createVideo, IMAGE_MODEL, pollVideo, UpstreamError, VIDEO_MODEL, type AgnesAccount, type AgnesSite } from "./agnes";
 import { ALIPAY_GATEWAY, amountCents, alipayOrderNo, createPagePayFields, createWapPayFields, isAlipayOrderNo, prefersMobilePay, queryTrade, verifyNotify } from "./alipay";
+import { moderationFailure, screenPrompt } from "./creem";
 import { createDb, DbError, isMissingSchema } from "./db";
 import { downloadTarget, mediaExtension } from "./download";
 import { HttpError, readJson, type Vars } from "./http";
@@ -357,6 +358,7 @@ app.post("/api/images", async (c) => {
   const body = await readJson<{ prompt?: string; ratio?: string; size?: string }>(c);
   const plan = effectivePlan(profile, await loadPlans(c.env));
   const input = parseImage(body, plan.max_image_size);
+  await moderatePrompt(c.env, input.prompt);
   await reserveQuota(c.env, profile.id, "image", quotaLimit(plan, "image"));
   const db = createDb(c.env);
   try {
@@ -474,6 +476,7 @@ app.post("/api/videos", async (c) => {
   const body = await readJson<{ prompt?: string; aspectRatio?: string; seconds?: string; firstFrame?: string }>(c);
   const plan = effectivePlan(profile, await loadPlans(c.env));
   const input = parseVideo(body);
+  await moderatePrompt(c.env, input.prompt);
   await reserveQuota(c.env, profile.id, "video", quotaLimit(plan, "video"));
   const db = createDb(c.env);
   try {
@@ -850,6 +853,21 @@ function parseAccount(body: { email?: string; password?: string; displayName?: s
     return assertAccount(body);
   } catch (error) {
     throw new HttpError(400, error instanceof Error ? error.message : "资料不正确", "account");
+  }
+}
+
+async function moderatePrompt(env: Env, prompt: string): Promise<void> {
+  try {
+    await screenPrompt(env, prompt);
+  } catch (error) {
+    const failure = moderationFailure(error);
+    if (!failure) throw error;
+    if (failure.status === 503) {
+      console.log(JSON.stringify({ event: "moderation.unavailable", reason: failure.reason }));
+    } else {
+      console.log(JSON.stringify({ event: "moderation.rejected", decision: failure.decision }));
+    }
+    throw new HttpError(failure.status, failure.message, failure.code);
   }
 }
 
