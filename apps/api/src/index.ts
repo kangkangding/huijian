@@ -6,6 +6,7 @@ import { createDb, DbError, isMissingSchema } from "./db";
 import { downloadTarget, mediaExtension } from "./download";
 import { HttpError, readJson, type Vars } from "./http";
 import { sendPasswordReset, sendVerification } from "./mail";
+import { screenPrompt } from "./moderation";
 import { hashPassword, randomToken, secretsMatch, sha256Hex, verifyPassword } from "./password";
 import {
   assertAccount,
@@ -357,6 +358,7 @@ app.post("/api/images", async (c) => {
   const body = await readJson<{ prompt?: string; ratio?: string; size?: string }>(c);
   const plan = effectivePlan(profile, await loadPlans(c.env));
   const input = parseImage(body, plan.max_image_size);
+  await screenPrompt(c.env.CREEM_API_KEY, input.prompt, `image:${profile.id}`);
   await reserveQuota(c.env, profile.id, "image", quotaLimit(plan, "image"));
   const db = createDb(c.env);
   try {
@@ -474,6 +476,7 @@ app.post("/api/videos", async (c) => {
   const body = await readJson<{ prompt?: string; aspectRatio?: string; seconds?: string; firstFrame?: string }>(c);
   const plan = effectivePlan(profile, await loadPlans(c.env));
   const input = parseVideo(body);
+  await screenPrompt(c.env.CREEM_API_KEY, input.prompt, `video:${profile.id}`);
   await reserveQuota(c.env, profile.id, "video", quotaLimit(plan, "video"));
   const db = createDb(c.env);
   try {

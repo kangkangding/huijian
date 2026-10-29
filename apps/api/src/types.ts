@@ -12,6 +12,7 @@ export type Env = {
   BREVO_API_KEY?: string;
   BREVO_SENDER_EMAIL?: string;
   BREVO_SENDER_NAME?: string;
+  CREEM_API_KEY?: string;
 };
 
 export type Role = "user" | "admin";
