@@ -18,9 +18,9 @@ export function Home() {
           </p>
           <div className="row">
             <Link className="btn" to="/studio">开始作图</Link>
-            <Link className="btn ghost" to="/pricing">限时 1.9 元</Link>
+            <Link className="btn ghost" to="/pricing">限时 2.99 美元</Link>
           </div>
-          <p className="quiet">免费每天 10 张图、200 条问答。会员每天 100 张图、2000 条问答、5 段视频。</p>
+          <p className="quiet">免费每天 10 张图、200 条问答。会员每天 200 张图、4000 条问答、10 段视频。</p>
         </div>
         <div className="posters" aria-hidden="true">
           <article className="poster cup">
@@ -54,8 +54,8 @@ export function Home() {
       <section className="offer">
         <div>
           <p className="eyebrow">会员</p>
-          <h2>月费 9.9 元，现在 1.9 元。</h2>
-          <p>两个价格都是 30 天，额度和清晰度相同。限时价在定价页标成促销方案。</p>
+          <h2>月费 4.99 美元，前 6 个月 2.99 美元。</h2>
+          <p>国内和国际同一套价格。额度和清晰度相同，限时价在定价页标成促销方案。</p>
         </div>
         <Link className="btn" to="/pricing">查看方案</Link>
       </section>

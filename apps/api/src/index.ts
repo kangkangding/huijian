@@ -17,6 +17,7 @@ import {
   effectivePlan,
   extendExpiry,
   isMember,
+  listedPlan,
   quotaLimit,
   shanghaiDay,
 } from "./plan";
@@ -832,7 +833,8 @@ async function issueVerification(env: Env, userId: string, email: string): Promi
 
 async function loadPlans(env: Env): Promise<Plan[]> {
   const db = createDb(env);
-  return db.get<Plan>("plans?select=*&order=price_cents.asc");
+  const plans = await db.get<Plan>("plans?select=*&order=price_cents.asc");
+  return plans.map(listedPlan);
 }
 
 async function loadAccounts(env: Env): Promise<AgnesAccount[]> {

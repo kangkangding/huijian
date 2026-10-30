@@ -21,6 +21,28 @@ export function effectivePlan(profile: Pick<Profile, "plan_code" | "plan_expires
   return plans.find((plan) => plan.code === profile.plan_code) ?? free;
 }
 
+const memberQuota = { image_daily: 200, chat_daily: 4000, video_daily: 10 };
+
+export function listedPlan(plan: Plan): Plan {
+  if (plan.code === "launch") {
+    return {
+      ...plan,
+      price_cents: 299,
+      ...memberQuota,
+      description: "前 6 个月每月 2.99 美元，之后每月 4.99 美元。每天 200 张图、4000 条问答、10 段视频。",
+    };
+  }
+  if (plan.code === "monthly") {
+    return {
+      ...plan,
+      price_cents: 499,
+      ...memberQuota,
+      description: "每月 4.99 美元。每天 200 张图、4000 条问答、10 段视频。",
+    };
+  }
+  return plan;
+}
+
 export function quotaLimit(plan: Plan, kind: UsageKind): number {
   if (kind === "image") return plan.image_daily;
   if (kind === "chat") return plan.chat_daily;

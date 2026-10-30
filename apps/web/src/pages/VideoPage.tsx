@@ -100,7 +100,7 @@ function VideoBody() {
         </label>
         <div className="row">
           <button className="btn" type="button" onClick={generate} disabled={pending || videoLocked}>{pending ? "提交中…" : "生成视频"}</button>
-          <span className="quiet">{videoLocked ? "免费方案不能出视频，开通会员后每天 5 段。" : `今日 ${usage?.used ?? 0} / ${usage?.limit ?? 0}`}</span>
+          <span className="quiet">{videoLocked ? "免费方案不能出视频，开通会员后每天 10 段。" : `今日 ${usage?.used ?? 0} / ${usage?.limit ?? 0}`}</span>
         </div>
         {error && <p className="error">{error}</p>}
       </div>

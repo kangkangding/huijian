@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { hashPassword, verifyPassword } from "../src/password.ts";
-import { assertImageInput, effectivePlan, extendExpiry, isMember } from "../src/plan.ts";
+import { assertImageInput, effectivePlan, extendExpiry, isMember, listedPlan } from "../src/plan.ts";
 import type { Plan, Profile } from "../src/types.ts";
 
 const plans: Plan[] = [
@@ -42,6 +42,19 @@ test("active membership keeps paid limits", () => {
 
 test("free users cannot request 2K", () => {
   assert.throws(() => assertImageInput({ prompt: "白瓷杯", ratio: "1:1", size: "2K" }, "1K"), /2K/);
+});
+
+test("paid plans share dollar prices and doubled quotas", () => {
+  const launch = listedPlan(plans[1]);
+  assert.equal(launch.price_cents, 299);
+  assert.equal(launch.image_daily, 200);
+  assert.equal(launch.chat_daily, 4000);
+  assert.equal(launch.video_daily, 10);
+  const monthly = listedPlan({ ...plans[1], code: "monthly", price_cents: 990 });
+  assert.equal(monthly.price_cents, 499);
+  assert.equal(monthly.image_daily, 200);
+  assert.equal(listedPlan(plans[0]).price_cents, 0);
+  assert.equal(listedPlan(plans[0]).image_daily, 10);
 });
 
 test("renewal extends from the later date", () => {
