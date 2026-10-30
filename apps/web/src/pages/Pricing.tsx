@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { api, redirectToAlipay, yuan, type Plan } from "../api";
+import { api, pageRail, redirectToAlipay, yuan, type Plan } from "../api";
 import { useAuth } from "../auth";
 import { useI18n } from "../i18n";
 
@@ -10,7 +10,7 @@ export function Pricing() {
   const { session } = useAuth();
   const { t, tr, planName } = useI18n();
   const [plans, setPlans] = useState<Plan[]>([]);
-  const [rail, setRail] = useState<Rail | "">("");
+  const [rail, setRail] = useState<Rail>(pageRail);
   const [error, setError] = useState("");
   const [pending, setPending] = useState("");
 
@@ -64,16 +64,16 @@ export function Pricing() {
     <section>
       <p className="eyebrow">{t("pricingEyebrow")}</p>
       <h1>{t("pricingTitle")}</h1>
-      <p className="lede">{rail === "alipay" ? t("pricingLedeAlipay") : rail === "creem" ? t("pricingLede") : ""}</p>
+      <p className="lede">{alipay ? t("pricingLedeAlipay") : t("pricingLede")}</p>
       <div className="cards pricing">
         {visible.map((plan) => (
           <article key={plan.code} className={plan.promo ? "featured" : ""}>
             {plan.promo && <span className="tag">{t("pricingTag")}</span>}
             <h2>{planName(plan.code, plan.name)}</h2>
             <p className="price">{priceText(plan, rail, t)}</p>
-            <p>{rail ? (blurbs[plan.code] ?? plan.description) : ""}</p>
+            <p>{blurbs[plan.code] ?? plan.description}</p>
             {rail === "creem" && plan.code === "launch" && <p>{t("pricingLaunchNote")}</p>}
-            {rail === "alipay" && plan.priceCents > 0 && <p>{t("pricingAlipayNote")}</p>}
+            {alipay && plan.priceCents > 0 && <p>{t("pricingAlipayNote")}</p>}
             <ul>
               <li>{t("pricingImages", { count: plan.imageDaily, size: plan.maxImageSize })}</li>
               <li>{t("pricingChats", { count: plan.chatDaily })}</li>
@@ -83,8 +83,6 @@ export function Pricing() {
               <Link className="btn ghost" to="/studio">{t("pricingDraw")}</Link>
             ) : !session ? (
               <Link className="btn" to="/register">{t("pricingRegister")}</Link>
-            ) : !rail ? (
-              <button className="btn" type="button" disabled>…</button>
             ) : alipay ? (
               <button className="btn" type="button" disabled={pending === `alipay-${plan.code}`} onClick={() => payAlipay(plan.code)}>
                 {pending === `alipay-${plan.code}` ? t("pricingAlipayOpening") : t("pricingAlipay")}
@@ -102,14 +100,11 @@ export function Pricing() {
   );
 }
 
-function priceText(plan: Plan, rail: Rail | "", t: ReturnType<typeof useI18n>["t"]): string {
+function priceText(plan: Plan, rail: Rail, t: ReturnType<typeof useI18n>["t"]): string {
   if (plan.priceCents === 0) return t("pricingFree");
   if (rail === "creem") return t("pricingUsd", { amount: yuan(plan.priceCents) });
-  if (rail === "alipay") {
-    const cents = plan.alipayCents || (plan.code === "launch" ? 1590 : 2690);
-    return t("pricingCny", { amount: yuan(cents) });
-  }
-  return "\u00a0";
+  const cents = plan.alipayCents || (plan.code === "launch" ? 1590 : 2690);
+  return t("pricingCny", { amount: yuan(cents) });
 }
 
 const fallback: Plan[] = [

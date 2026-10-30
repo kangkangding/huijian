@@ -72,6 +72,11 @@ export async function downloadFile(path: string, name: string): Promise<void> {
   URL.revokeObjectURL(url);
 }
 
+export function pageRail(): "alipay" | "creem" {
+  const value = document.documentElement.dataset.rail;
+  return value === "alipay" ? "alipay" : "creem";
+}
+
 export function yuan(cents: number): string {
   const value = cents / 100;
   if (Number.isInteger(value)) return String(value);
