@@ -82,6 +82,7 @@ export type Plan = {
   code: string;
   name: string;
   priceCents: number;
+  alipayCents?: number;
   durationDays: number;
   promo: boolean;
   imageDaily: number;

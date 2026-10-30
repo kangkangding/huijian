@@ -1,8 +1,17 @@
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import { api } from "../api";
 import { useI18n } from "../i18n";
 
 export function Home() {
   const { t } = useI18n();
+  const [alipay, setAlipay] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    api<{ rail: string }>("/api/checkout")
+      .then((data) => setAlipay(data.rail === "alipay"))
+      .catch(() => setAlipay(false));
+  }, []);
   const audiences = [
     [t("audienceShop"), t("audienceShopCopy"), t("audienceShopSample")],
     [t("audienceStudy"), t("audienceStudyCopy"), t("audienceStudySample")],
@@ -18,7 +27,7 @@ export function Home() {
           <p className="lede">{t("homeLede")}</p>
           <div className="row">
             <Link className="btn" to="/studio">{t("homeStart")}</Link>
-            <Link className="btn ghost" to="/pricing">{t("homePrice")}</Link>
+            <Link className="btn ghost" to="/pricing">{alipay === null ? t("homeOfferButton") : alipay ? t("homePriceAlipay") : t("homePrice")}</Link>
           </div>
           <p className="quiet">{t("homeQuiet")}</p>
         </div>
@@ -54,8 +63,8 @@ export function Home() {
       <section className="offer">
         <div>
           <p className="eyebrow">{t("homeOfferEyebrow")}</p>
-          <h2>{t("homeOfferTitle")}</h2>
-          <p>{t("homeOfferCopy")}</p>
+          <h2>{alipay === null ? t("homeOfferButton") : alipay ? t("homeOfferTitleAlipay") : t("homeOfferTitle")}</h2>
+          <p>{alipay === null ? "" : alipay ? t("homeOfferCopyAlipay") : t("homeOfferCopy")}</p>
         </div>
         <Link className="btn" to="/pricing">{t("homeOfferButton")}</Link>
       </section>

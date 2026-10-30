@@ -23,6 +23,17 @@ export function effectivePlan(profile: Pick<Profile, "plan_code" | "plan_expires
 
 const memberQuota = { image_daily: 200, chat_daily: 4000, video_daily: 10 };
 
+const alipayPriceCents = { launch: 1590, monthly: 2690 } as const;
+
+export function alipayCents(code: string): number | null {
+  if (code === "launch" || code === "monthly") return alipayPriceCents[code];
+  return null;
+}
+
+export function checkoutRail(country: string | undefined): "alipay" | "creem" {
+  return country === "CN" ? "alipay" : "creem";
+}
+
 export function listedPlan(plan: Plan): Plan {
   if (plan.code === "launch") {
     return {

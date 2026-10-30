@@ -17,6 +17,8 @@ import {
   effectivePlan,
   extendExpiry,
   isMember,
+  alipayCents,
+  checkoutRail,
   listedPlan,
   quotaLimit,
   shanghaiDay,
@@ -196,17 +198,21 @@ app.get("/api/plans", async (c) => {
   return c.json({ plans: plans.filter((plan) => plan.active).map(publicPlan) });
 });
 
+app.get("/api/checkout", (c) => c.json({ rail: checkoutRail(visitorCountry(c.req.raw)) }));
+
 app.post("/api/membership/orders", async (c) => {
   const profile = await requireUser(c);
+  if (checkoutRail(visitorCountry(c.req.raw)) !== "alipay") throw new HttpError(400, "当前地区请使用银行卡订阅", "payment");
   const body = await readJson<{ planCode?: string }>(c);
   const plans = await loadPlans(c.env);
   const plan = plans.find((item) => item.code === body.planCode && item.active && item.price_cents > 0);
-  if (!plan) throw new HttpError(400, "没有这个会员方案", "plan");
+  const cents = alipayCents(plan?.code ?? "");
+  if (!plan || cents === null) throw new HttpError(400, "没有这个会员方案", "plan");
   const db = createDb(c.env);
   const rows = await db.post<{ id: string; amount_cents: number; status: string; plan_code: string }>("orders", {
     user_id: profile.id,
     plan_code: plan.code,
-    amount_cents: plan.price_cents,
+    amount_cents: cents,
     status: "pending",
   });
   return c.json({ order: rows[0], plan: publicPlan(plan) });
@@ -938,11 +944,17 @@ async function presentUser(env: Env, profile: Profile) {
   };
 }
 
+function visitorCountry(request: Request): string {
+  const country = (request as Request & { cf?: { country?: string } }).cf?.country;
+  return typeof country === "string" ? country : "";
+}
+
 function publicPlan(plan: Plan) {
   return {
     code: plan.code,
     name: plan.name,
     priceCents: plan.price_cents,
+    alipayCents: alipayCents(plan.code) ?? 0,
     durationDays: plan.duration_days,
     promo: plan.promo,
     imageDaily: plan.image_daily,

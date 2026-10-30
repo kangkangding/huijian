@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { hashPassword, verifyPassword } from "../src/password.ts";
-import { assertImageInput, effectivePlan, extendExpiry, isMember, listedPlan } from "../src/plan.ts";
+import { alipayCents, assertImageInput, checkoutRail, effectivePlan, extendExpiry, isMember, listedPlan } from "../src/plan.ts";
 import type { Plan, Profile } from "../src/types.ts";
 
 const plans: Plan[] = [
@@ -55,6 +55,16 @@ test("paid plans share dollar prices and doubled quotas", () => {
   assert.equal(monthly.image_daily, 200);
   assert.equal(listedPlan(plans[0]).price_cents, 0);
   assert.equal(listedPlan(plans[0]).image_daily, 10);
+});
+
+test("mainland China checks out with Alipay yuan prices", () => {
+  assert.equal(checkoutRail("CN"), "alipay");
+  assert.equal(checkoutRail("HK"), "creem");
+  assert.equal(checkoutRail("US"), "creem");
+  assert.equal(checkoutRail(undefined), "creem");
+  assert.equal(alipayCents("launch"), 1590);
+  assert.equal(alipayCents("monthly"), 2690);
+  assert.equal(alipayCents("free"), null);
 });
 
 test("renewal extends from the later date", () => {
