@@ -3,7 +3,7 @@ import { useSearchParams } from "react-router-dom";
 import { api, redirectToAlipay, yuan } from "../api";
 import { NeedLogin, useAuth } from "../auth";
 
-type Order = { id: string; plan_code: string; amount_cents: number; status: string; created_at: string };
+type Order = { id: string; plan_code: string; amount_cents: number; status: string; created_at: string; out_trade_no?: string | null };
 type KeyState = { configured: boolean; hint: string; fallback?: boolean };
 
 export function Account() {
@@ -125,7 +125,7 @@ function AccountBody() {
           <li key={order.id}>
             <div className="order-main">
               <strong>{names[order.plan_code] ?? order.plan_code}</strong>
-              <span>{yuan(order.amount_cents)} 元 · {orderTime(order.created_at)}</span>
+              <span>{order.out_trade_no?.startsWith("creem:") ? `${yuan(order.amount_cents)} 美元` : `${yuan(order.amount_cents)} 元`} · {orderTime(order.created_at)}</span>
             </div>
             <div className="order-side">
               <span className={`status ${order.status}`}>{orderStatus(order.status)}</span>

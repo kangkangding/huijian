@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { createChat, createImage, createVideo, IMAGE_MODEL, pollVideo, UpstreamError, VIDEO_MODEL, type AgnesAccount, type AgnesSite } from "./agnes";
 import { ALIPAY_GATEWAY, amountCents, alipayOrderNo, createPagePayFields, createWapPayFields, isAlipayOrderNo, prefersMobilePay, queryTrade, verifyNotify } from "./alipay";
+import { creemPlans, creemWebhookVerified, createCreemCheckout, readCreemEvent, type CreemAction } from "./creem";
 import { createDb, DbError, isMissingSchema } from "./db";
 import { downloadTarget, mediaExtension } from "./download";
 import { HttpError, readJson, type Vars } from "./http";
@@ -214,7 +215,7 @@ app.get("/api/membership/orders", async (c) => {
   const profile = await requireUser(c);
   const db = createDb(c.env);
   const orders = await db.get<{ id: string; plan_code: string; amount_cents: number; status: string; created_at: string; paid_at: string | null }>(
-    `orders?user_id=eq.${profile.id}&select=id,plan_code,amount_cents,status,created_at,paid_at&order=created_at.desc&limit=20`,
+    `orders?user_id=eq.${profile.id}&select=id,plan_code,amount_cents,status,created_at,paid_at,out_trade_no&order=created_at.desc&limit=20`,
   );
   return c.json({ orders });
 });
@@ -332,6 +333,56 @@ app.post("/api/payments/alipay/notify", async (c) => {
     return c.text("failure");
   }
   return c.text("success");
+});
+
+app.post("/api/membership/creem", async (c) => {
+  const profile = await requireUser(c);
+  const body = await readJson<{ planCode?: string }>(c);
+  if (body.planCode !== "launch" && body.planCode !== "monthly") throw new HttpError(400, "没有这个会员方案", "plan");
+  const apiKey = c.env.CREEM_API_KEY?.trim() ?? "";
+  if (!c.env.CREEM_WEBHOOK_SECRET?.trim() || !apiKey.startsWith("creem_") || apiKey.startsWith("creem_test_")) {
+    throw new HttpError(502, "国际支付还在接通", "payment");
+  }
+  try {
+    const url = await createCreemCheckout({
+      apiKey,
+      planCode: body.planCode,
+      userId: profile.id,
+      email: profile.email,
+      successUrl: `${c.env.APP_ORIGIN.replace(/\/$/, "")}/account`,
+    });
+    return c.json({ url });
+  } catch (error) {
+    if (error instanceof HttpError) throw error;
+    console.log(JSON.stringify({ event: "creem.checkout", message: error instanceof Error ? error.message : "unknown" }));
+    throw new HttpError(502, "国际支付暂时不可用", "payment");
+  }
+});
+
+app.post("/api/payments/creem/webhook", async (c) => {
+  const payload = await c.req.text();
+  const secret = c.env.CREEM_WEBHOOK_SECRET?.trim() ?? "";
+  if (!secret || !await creemWebhookVerified(secret, payload, c.req.raw.headers)) {
+    console.log(JSON.stringify({ event: "creem.webhook", verified: false }));
+    return c.json({ error: "签名未通过" }, 401);
+  }
+  let body: unknown;
+  try {
+    body = JSON.parse(payload);
+  } catch {
+    return c.json({ ok: true });
+  }
+  const event = readCreemEvent(body);
+  const planCode = event.planCode;
+  if (event.action === "ignore" || !planCode) return c.json({ ok: true });
+  try {
+    if (event.action === "grant") await grantCreemPayment(c.env, { ...event, planCode });
+    else await revokeCreemAccess(c.env, event);
+  } catch (error) {
+    console.log(JSON.stringify({ event: "creem.webhook", message: error instanceof Error ? error.message : "unknown" }));
+    return c.json({ error: "处理失败" }, 500);
+  }
+  return c.json({ ok: true });
 });
 
 app.post("/api/membership/orders/:id/confirm", async (c) => {
@@ -651,6 +702,58 @@ async function loadOwnedOrder(env: Env, orderId: string, userId: string): Promis
   );
   if (!rows[0]) throw new HttpError(404, "找不到订单", "order");
   return rows[0];
+}
+
+async function grantCreemPayment(env: Env, event: CreemAction & { planCode: keyof typeof creemPlans }): Promise<void> {
+  const db = createDb(env);
+  const userId = await resolveCreemUser(db, event);
+  if (!userId) {
+    console.log(JSON.stringify({ event: "creem.unmapped", plan: event.planCode }));
+    return;
+  }
+  const tradeNo = `creem:${event.transactionId}`;
+  try {
+    await db.post("orders", {
+      user_id: userId,
+      plan_code: event.planCode,
+      amount_cents: event.amountCents || creemPlans[event.planCode].amountCents,
+      status: "paid",
+      paid_at: new Date().toISOString(),
+      out_trade_no: tradeNo,
+    });
+  } catch (error) {
+    if (error instanceof DbError && error.code === "23503") return;
+    if (!(error instanceof DbError && error.code === "23505")) throw error;
+  }
+  const profiles = await db.get<Profile>(`profiles?id=eq.${userId}&select=*`);
+  const profile = profiles[0];
+  if (!profile) return;
+  const periodEnd = Date.parse(event.periodEnd);
+  const current = profile.plan_expires_at ? Date.parse(profile.plan_expires_at) : 0;
+  const expiry = Number.isFinite(periodEnd)
+    ? new Date(Math.max(current, periodEnd)).toISOString()
+    : extendExpiry(profile.plan_expires_at, 30);
+  await db.patch(`profiles?id=eq.${userId}`, { plan_code: event.planCode, plan_expires_at: expiry });
+  console.log(JSON.stringify({ event: "creem.paid", userId, plan: event.planCode }));
+}
+
+async function revokeCreemAccess(env: Env, event: CreemAction): Promise<void> {
+  const end = Date.parse(event.periodEnd);
+  if (!Number.isFinite(end)) return;
+  const db = createDb(env);
+  const userId = await resolveCreemUser(db, event);
+  if (!userId) return;
+  const profiles = await db.get<Profile>(`profiles?id=eq.${userId}&select=plan_expires_at`);
+  const current = profiles[0]?.plan_expires_at ? Date.parse(profiles[0].plan_expires_at) : 0;
+  if (!current || current > end + 48 * 60 * 60 * 1000) return;
+  await db.patch(`profiles?id=eq.${userId}`, { plan_expires_at: new Date(end).toISOString() });
+}
+
+async function resolveCreemUser(db: ReturnType<typeof createDb>, event: CreemAction): Promise<string> {
+  if (event.userId) return event.userId;
+  if (!event.email) return "";
+  const rows = await db.get<{ id: string }>(`profiles?email=eq.${encodeURIComponent(event.email)}&select=id&limit=1`);
+  return rows[0]?.id ?? "";
 }
 
 async function markOrderPaid(env: Env, order: PaidOrder): Promise<Profile> {
