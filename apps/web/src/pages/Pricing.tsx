@@ -75,9 +75,9 @@ export function Pricing() {
             {rail === "creem" && plan.code === "launch" && <p>{t("pricingLaunchNote")}</p>}
             {alipay && plan.priceCents > 0 && <p>{t("pricingAlipayNote")}</p>}
             <ul>
-              <li>{t("pricingImages", { count: periodQuota(alipay, plan, plan.imageDaily), size: plan.maxImageSize })}</li>
-              <li>{t("pricingChats", { count: periodQuota(alipay, plan, plan.chatDaily) })}</li>
-              <li>{t("pricingVideos", { count: periodQuota(alipay, plan, plan.videoDaily) })}</li>
+              <li>{t("pricingImages", { count: plan.imageDaily, size: plan.maxImageSize })}</li>
+              <li>{t("pricingChats", { count: plan.chatDaily })}</li>
+              <li>{t("pricingVideos", { count: plan.videoDaily })}</li>
             </ul>
             {plan.priceCents === 0 ? (
               <Link className="btn ghost" to="/studio">{t("pricingDraw")}</Link>
@@ -98,10 +98,6 @@ export function Pricing() {
       {error && <p className="error">{tr(error)}</p>}
     </section>
   );
-}
-
-function periodQuota(alipay: boolean, plan: Plan, count: number): string | number {
-  return alipay && plan.priceCents > 0 ? `${count}*30` : count;
 }
 
 function priceText(plan: Plan, rail: Rail, t: ReturnType<typeof useI18n>["t"]): string {
