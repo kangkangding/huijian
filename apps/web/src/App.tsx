@@ -1,5 +1,6 @@
 import { BrowserRouter, Route, Routes } from "react-router-dom";
 import { AuthProvider } from "./auth";
+import { LocaleProvider } from "./i18n";
 import { Shell } from "./components/Shell";
 import { Account } from "./pages/Account";
 import { Auth } from "./pages/Auth";
@@ -13,6 +14,7 @@ import { VideoPage } from "./pages/VideoPage";
 
 export function App() {
   return (
+    <LocaleProvider>
     <AuthProvider>
       <BrowserRouter>
         <Routes>
@@ -36,5 +38,6 @@ export function App() {
         </Routes>
       </BrowserRouter>
     </AuthProvider>
+    </LocaleProvider>
   );
 }

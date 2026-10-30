@@ -2,18 +2,19 @@ import { Link, NavLink, Outlet, useNavigate } from "react-router-dom";
 import { supportEmail } from "../pages/Legal";
 import { api, tokenStore } from "../api";
 import { useAuth } from "../auth";
-
-const links = [
-  ["/studio", "文生图"],
-  ["/chat", "问答"],
-  ["/video", "视频"],
-  ["/gallery", "作品"],
-  ["/pricing", "会员"],
-];
+import { useI18n, type Locale } from "../i18n";
 
 export function Shell() {
   const { session, setSession } = useAuth();
+  const { t, locale, setLocale } = useI18n();
   const navigate = useNavigate();
+  const links = [
+    ["/studio", t("navStudio")],
+    ["/chat", t("navChat")],
+    ["/video", t("navVideo")],
+    ["/gallery", t("navGallery")],
+    ["/pricing", t("navPricing")],
+  ];
 
   async function logout() {
     await api("/api/auth/logout", { method: "POST" }).catch(() => undefined);
@@ -27,7 +28,7 @@ export function Shell() {
       <header className="nav">
         <a className="brand" href="/">
           <span className="mark" aria-hidden="true" />
-          绘简
+          {t("brand")}
         </a>
         <nav>
           {links.map(([href, label]) => (
@@ -35,15 +36,22 @@ export function Shell() {
           ))}
         </nav>
         <div className="nav-end">
+          <div className="lang" role="group" aria-label={t("langLabel")}>
+            {(["zh", "en"] as Locale[]).map((item) => (
+              <button key={item} type="button" className={locale === item ? "on" : ""} onClick={() => setLocale(item)}>
+                {item === "zh" ? "中文" : "EN"}
+              </button>
+            ))}
+          </div>
           {session ? (
             <>
               <a href="/account">{session.user.displayName}</a>
-              <button type="button" className="text-btn" onClick={logout}>退出</button>
+              <button type="button" className="text-btn" onClick={logout}>{t("logout")}</button>
             </>
           ) : (
             <>
-              <a href="/login">登录</a>
-              <a className="btn small" href="/register">注册</a>
+              <a href="/login">{t("login")}</a>
+              <a className="btn small" href="/register">{t("register")}</a>
             </>
           )}
         </div>
@@ -53,13 +61,13 @@ export function Shell() {
       </main>
       <footer className="foot">
         <div className="foot-links">
-          <span>绘简</span>
+          <span>{t("brand")}</span>
           <a href={`mailto:${supportEmail}`}>{supportEmail}</a>
-          <Link to="/privacy">隐私政策</Link>
-          <Link to="/terms">使用条款</Link>
-          <Link to="/acceptable-use">使用规范</Link>
+          <Link to="/privacy">{t("privacy")}</Link>
+          <Link to="/terms">{t("terms")}</Link>
+          <Link to="/acceptable-use">{t("acceptable")}</Link>
         </div>
-        <span>请勿生成侵权、违法或色情内容。</span>
+        <span>{t("footerNote")}</span>
       </footer>
     </div>
   );

@@ -2,6 +2,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { api, ApiError, tokenStore } from "../api";
 import { useAuth, type Session } from "../auth";
+import { useI18n } from "../i18n";
 
 type Mode = "login" | "register" | "forgot" | "reset" | "verify";
 
@@ -9,6 +10,7 @@ export function Auth({ mode }: { mode: Mode }) {
   const navigate = useNavigate();
   const [params] = useSearchParams();
   const { setSession } = useAuth();
+  const { t, tr } = useI18n();
   const [displayName, setDisplayName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -93,7 +95,13 @@ export function Auth({ mode }: { mode: Mode }) {
     }
   }
 
-  const title = { login: "登录", register: "注册", forgot: "找回密码", reset: "设置新密码", verify: "确认邮箱" }[mode];
+  const title = {
+    login: t("authLogin"),
+    register: t("authRegister"),
+    forgot: t("authForgot"),
+    reset: t("authReset"),
+    verify: t("authVerify"),
+  }[mode];
 
   async function resend() {
     setPending(true);
@@ -114,42 +122,42 @@ export function Auth({ mode }: { mode: Mode }) {
 
   return (
     <section className="auth">
-      <p className="eyebrow">账号</p>
+      <p className="eyebrow">{t("accountEyebrow")}</p>
       <h1>{title}</h1>
       {mode === "verify" ? (
         <>
-          {!error && !message && <p className="quiet">正在确认邮箱…</p>}
-          {error && <p className="error">{error}</p>}
-          {message && <p className="ok">{message}</p>}
+          {!error && !message && <p className="quiet">{t("authVerifying")}</p>}
+          {error && <p className="error">{tr(error)}</p>}
+          {message && <p className="ok">{tr(message)}</p>}
         </>
       ) : (
         <form onSubmit={onSubmit}>
           {mode === "register" && (
-            <label>昵称
+            <label>{t("authName")}
               <input value={displayName} onChange={(event) => setDisplayName(event.target.value)} required maxLength={32} />
             </label>
           )}
           {mode !== "reset" && (
-            <label>邮箱
+            <label>{t("authEmail")}
               <input type="email" value={email} onChange={(event) => setEmail(event.target.value)} required />
             </label>
           )}
           {mode !== "forgot" && (
-            <label>密码
+            <label>{t("authPassword")}
               <input type="password" value={password} onChange={(event) => setPassword(event.target.value)} required minLength={8} />
             </label>
           )}
-          {error && <p className="error">{error}</p>}
-          {canResend && <button className="text-btn" type="button" onClick={resend} disabled={pending}>重新发送验证邮件</button>}
-          {message && <p className="ok">{message}</p>}
-          <button className="btn" type="submit" disabled={pending || (mode === "reset" && !params.get("token"))}>{pending ? "提交中…" : title}</button>
+          {error && <p className="error">{tr(error)}</p>}
+          {canResend && <button className="text-btn" type="button" onClick={resend} disabled={pending}>{t("authResend")}</button>}
+          {message && <p className="ok">{tr(message)}</p>}
+          <button className="btn" type="submit" disabled={pending || (mode === "reset" && !params.get("token"))}>{pending ? t("authPending") : title}</button>
         </form>
       )}
       <p className="quiet">
-        {mode === "login" && <><Link to="/register">没有账号</Link> · <Link to="/forgot">忘记密码</Link></>}
-        {mode === "register" && <Link to="/login">已有账号</Link>}
-        {mode === "forgot" && <Link to="/login">返回登录</Link>}
-        {(mode === "reset" || mode === "verify") && <Link to="/login">去登录</Link>}
+        {mode === "login" && <><Link to="/register">{t("authNoAccount")}</Link> · <Link to="/forgot">{t("authForgotLink")}</Link></>}
+        {mode === "register" && <Link to="/login">{t("authHasAccount")}</Link>}
+        {mode === "forgot" && <Link to="/login">{t("authBackLogin")}</Link>}
+        {(mode === "reset" || mode === "verify") && <Link to="/login">{t("authGoLogin")}</Link>}
       </p>
     </section>
   );

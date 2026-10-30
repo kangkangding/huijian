@@ -2,20 +2,7 @@ import { useEffect, useState } from "react";
 import { api, type ImageItem } from "../api";
 import { DownloadButton } from "../components/DownloadButton";
 import { NeedLogin, useAuth } from "../auth";
-
-const ratios = [
-  ["1:1", "方图"],
-  ["3:4", "竖图"],
-  ["4:3", "横图"],
-  ["9:16", "海报"],
-  ["16:9", "宽屏"],
-];
-
-const samples = [
-  "白瓷杯放在米白桌布上，柔和窗光，干净背景，商品摄影",
-  "帆布包平铺在浅木桌上，俯拍，自然光，电商主图",
-  "清晨图书馆封面插画，暖色扁平，适合课堂作业",
-];
+import { useI18n } from "../i18n";
 
 export function Studio() {
   return (
@@ -27,7 +14,20 @@ export function Studio() {
 
 function StudioBody() {
   const { session, refresh } = useAuth();
-  const [prompt, setPrompt] = useState(samples[0]);
+  const { t, tr } = useI18n();
+  const samples = [
+    { label: t("sampleCup"), prompt: t("promptCup") },
+    { label: t("sampleBag"), prompt: t("promptBag") },
+    { label: t("sampleLibrary"), prompt: t("promptLibrary") },
+  ];
+  const ratios = [
+    ["1:1", t("studioSquare")],
+    ["3:4", t("studioPortrait")],
+    ["4:3", t("studioLandscape")],
+    ["9:16", t("studioPoster")],
+    ["16:9", t("studioWide")],
+  ];
+  const [prompt, setPrompt] = useState(samples[0].prompt);
   const [ratio, setRatio] = useState("1:1");
   const [size, setSize] = useState("1K");
   const allow2k = session?.user.maxImageSize === "2K";
@@ -70,12 +70,12 @@ function StudioBody() {
   return (
     <section className="studio">
       <div className="composer">
-        <p className="eyebrow">文生图</p>
-        <h1>写下你要的画面。</h1>
+        <p className="eyebrow">{t("studioEyebrow")}</p>
+        <h1>{t("studioTitle")}</h1>
         <textarea value={prompt} onChange={(event) => setPrompt(event.target.value)} rows={6} maxLength={1000} />
         <div className="chips">
           {samples.map((sample) => (
-            <button key={sample} type="button" className="chip" onClick={() => setPrompt(sample)}>{sample.slice(0, 10)}…</button>
+            <button key={sample.prompt} type="button" className="chip" onClick={() => setPrompt(sample.prompt)}>{sample.label}</button>
           ))}
         </div>
         <div className="choices">
@@ -94,20 +94,20 @@ function StudioBody() {
               disabled={value === "2K" && !allow2k}
               onClick={() => setSize(value)}
             >
-              {value === "1K" ? "标准 1K" : allow2k ? "高清 2K" : "高清 2K · 会员"}
+              {value === "1K" ? t("studio1k") : allow2k ? t("studio2k") : t("studio2kMember")}
             </button>
           ))}
         </div>
         <div className="row">
           <button className="btn" type="button" onClick={generate} disabled={pending}>
-            {pending ? "正在画…" : "生成图片"}
+            {pending ? t("studioDrawing") : t("studioGenerate")}
           </button>
-          <span className="quiet">今日 {usage?.used ?? 0} / {usage?.limit ?? 0}</span>
+          <span className="quiet">{t("studioToday", { used: usage?.used ?? 0, limit: usage?.limit ?? 0 })}</span>
         </div>
-        {error && <p className="error">{error}</p>}
+        {error && <p className="error">{tr(error)}</p>}
       </div>
       <div className="stage">
-        {current?.url ? <img src={current.url} alt={current.prompt} /> : <div className="empty">生成结果会停在这里。</div>}
+        {current?.url ? <img src={current.url} alt={current.prompt} /> : <div className="empty">{t("studioEmpty")}</div>}
         {current?.url && <DownloadButton path={`/api/images/${current.id}/file`} name="huijian-image" at={current.created_at} />}
         {current && <p>{current.prompt}</p>}
         <div className="thumbs">

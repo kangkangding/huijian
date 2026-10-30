@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { api, ApiError, tokenStore } from "./api";
+import { useI18n } from "./i18n";
 
 export type Session = {
   user: {
@@ -64,16 +65,17 @@ export function useAuth(): AuthValue {
 
 export function NeedLogin({ children }: { children: ReactNode }) {
   const { session, ready } = useAuth();
-  if (!ready) return <p className="quiet">正在确认登录状态…</p>;
+  const { t } = useI18n();
+  if (!ready) return <p className="quiet">{t("checking")}</p>;
   if (!session) {
     return (
       <section className="gate">
-        <p className="eyebrow">需要登录</p>
-        <h1>先留下一个账号。</h1>
-        <p>免费账号就能试出图和问答。视频在会员里。</p>
+        <p className="eyebrow">{t("gateEyebrow")}</p>
+        <h1>{t("gateTitle")}</h1>
+        <p>{t("gateCopy")}</p>
         <div className="row">
-          <Link className="btn" to="/register">注册</Link>
-          <Link className="btn ghost" to="/login">登录</Link>
+          <Link className="btn" to="/register">{t("register")}</Link>
+          <Link className="btn ghost" to="/login">{t("login")}</Link>
         </div>
       </section>
     );

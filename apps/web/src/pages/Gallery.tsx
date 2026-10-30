@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { api, type ImageItem, type VideoItem } from "../api";
 import { DownloadButton } from "../components/DownloadButton";
 import { NeedLogin } from "../auth";
+import { useI18n } from "../i18n";
 
 export function Gallery() {
   return <NeedLogin><GalleryBody /></NeedLogin>;
@@ -10,6 +11,7 @@ export function Gallery() {
 function GalleryBody() {
   const [images, setImages] = useState<ImageItem[]>([]);
   const [videos, setVideos] = useState<VideoItem[]>([]);
+  const { t, tr } = useI18n();
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -26,9 +28,9 @@ function GalleryBody() {
 
   return (
     <section>
-      <p className="eyebrow">作品</p>
-      <h1>你生成过的图和视频。</h1>
-      {error && <p className="error">{error}</p>}
+      <p className="eyebrow">{t("galleryEyebrow")}</p>
+      <h1>{t("galleryTitle")}</h1>
+      {error && <p className="error">{tr(error)}</p>}
       <div className="gallery">
         {pictures.map((item) => (
           <figure key={item.id}>
@@ -45,7 +47,7 @@ function GalleryBody() {
           </figure>
         ))}
       </div>
-      {pictures.length === 0 && clips.length === 0 && !error && <p className="quiet">还没有完成的作品。去文生图写第一句。</p>}
+      {pictures.length === 0 && clips.length === 0 && !error && <p className="quiet">{t("galleryEmpty")}</p>}
     </section>
   );
 }

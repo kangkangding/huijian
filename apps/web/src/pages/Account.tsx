@@ -2,6 +2,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import { useSearchParams } from "react-router-dom";
 import { api, redirectToAlipay, yuan } from "../api";
 import { NeedLogin, useAuth } from "../auth";
+import { useI18n } from "../i18n";
 
 type Order = { id: string; plan_code: string; amount_cents: number; status: string; created_at: string; out_trade_no?: string | null };
 type KeyState = { configured: boolean; hint: string; fallback?: boolean };
@@ -12,11 +13,12 @@ export function Account() {
 
 function AccountBody() {
   const { session, refresh } = useAuth();
+  const { t, tr, planName, dateLocale } = useI18n();
   const [params] = useSearchParams();
   const [orders, setOrders] = useState<Order[]>([]);
   const [keyState, setKeyState] = useState<KeyState>({ configured: false, hint: "" });
   const [apiKey, setApiKey] = useState("");
-  const [names, setNames] = useState<Record<string, string>>({ launch: "限时会员", monthly: "月费会员" });
+  const [names, setNames] = useState<Record<string, string>>({});
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
 
@@ -110,64 +112,64 @@ function AccountBody() {
 
   return (
     <section className="account">
-      <p className="eyebrow">账户</p>
+      <p className="eyebrow">{t("accountTitle")}</p>
       <h1>{user.displayName}</h1>
       <p>{user.email}</p>
-      <p>{user.member ? `${user.planName}，有效至 ${user.planExpiresAt ? new Date(user.planExpiresAt).toLocaleDateString("zh-CN") : ""}` : "当前是免费方案"}</p>
+      <p>{user.member ? t("accountMember", { plan: planName(user.planCode, user.planName), date: user.planExpiresAt ? new Date(user.planExpiresAt).toLocaleDateString(dateLocale) : "" }) : t("accountFree")}</p>
       <div className="meters">
-        <Meter label="图片" used={usage.image.used} limit={usage.image.limit} />
-        <Meter label="问答" used={usage.chat.used} limit={usage.chat.limit} />
-        <Meter label="视频" used={usage.video.used} limit={usage.video.limit} />
+        <Meter label={t("accountImages")} used={usage.image.used} limit={usage.image.limit} closed={t("accountClosed")} />
+        <Meter label={t("accountChats")} used={usage.chat.used} limit={usage.chat.limit} closed={t("accountClosed")} />
+        <Meter label={t("accountVideos")} used={usage.video.used} limit={usage.video.limit} closed={t("accountClosed")} />
       </div>
-      <h2>订单</h2>
+      <h2>{t("accountOrders")}</h2>
       <ul className="orders">
         {orders.map((order) => (
           <li key={order.id}>
             <div className="order-main">
-              <strong>{names[order.plan_code] ?? order.plan_code}</strong>
-              <span>{order.out_trade_no?.startsWith("creem:") ? `${yuan(order.amount_cents)} 美元` : `${yuan(order.amount_cents)} 元`} · {orderTime(order.created_at)}</span>
+              <strong>{planName(order.plan_code, names[order.plan_code])}</strong>
+              <span>{(order.out_trade_no?.startsWith("creem:") ? t("accountUsd", { amount: yuan(order.amount_cents) }) : t("accountCny", { amount: yuan(order.amount_cents) }))} · {orderTime(order.created_at, dateLocale)}</span>
             </div>
             <div className="order-side">
-              <span className={`status ${order.status}`}>{orderStatus(order.status)}</span>
+              <span className={`status ${order.status}`}>{orderLabel(order.status, t)}</span>
               {order.status === "pending" && (
                 <div className="order-actions">
-                  <button type="button" className="btn small" onClick={() => pay(order.id)}>继续支付</button>
-                  <button type="button" className="btn small ghost" onClick={() => sync(order.id)}>我已支付</button>
-                  <button type="button" className="text-btn" onClick={() => cancel(order.id)}>取消</button>
+                  <button type="button" className="btn small" onClick={() => pay(order.id)}>{t("accountPay")}</button>
+                  <button type="button" className="btn small ghost" onClick={() => sync(order.id)}>{t("accountPaidCheck")}</button>
+                  <button type="button" className="text-btn" onClick={() => cancel(order.id)}>{t("accountCancel")}</button>
                 </div>
               )}
             </div>
           </li>
         ))}
       </ul>
-      {orders.length === 0 && <p className="quiet">还没有订单。</p>}
+      {orders.length === 0 && <p className="quiet">{t("accountNone")}</p>}
       {user.role === "admin" && (
         <form onSubmit={saveKey} className="key-form">
-          <h2>Agnes 密钥</h2>
-          <p className="quiet">{keyState.configured ? (keyState.fallback ? `国内密钥 ${keyState.hint}。这一边失败时会自动改用国际密钥。数据库里只是国内密钥的备份，Cloudflare 里的密钥优先。` : `线上正在使用的密钥 ${keyState.hint}。这里保存的是数据库备份，Cloudflare 里的密钥优先。`) : "还没有密钥。第一个注册的账号是管理员。"}</p>
-          <label>新密钥
+          <h2>{t("keyTitle")}</h2>
+          <p className="quiet">{keyState.configured ? (keyState.fallback ? t("keyFallback", { hint: keyState.hint }) : t("keyLive", { hint: keyState.hint })) : t("keyMissing")}</p>
+          <label>{t("keyNew")}
             <input type="password" value={apiKey} onChange={(event) => setApiKey(event.target.value)} autoComplete="off" />
           </label>
-          <button className="btn" type="submit">保存到数据库</button>
+          <button className="btn" type="submit">{t("keySave")}</button>
         </form>
       )}
-      {message && <p className="ok">{message}</p>}
-      {error && <p className="error">{error}</p>}
+      {message && <p className="ok">{tr(message)}</p>}
+      {error && <p className="error">{tr(error)}</p>}
     </section>
   );
 }
 
-function orderStatus(status: string): string {
-  if (status === "paid") return "已支付";
-  if (status === "pending") return "待支付";
-  if (status === "cancelled") return "已取消";
+function orderLabel(status: string, t: ReturnType<typeof useI18n>["t"]): string {
+  if (status === "paid") return t("statusPaid");
+  if (status === "pending") return t("statusPending");
+  if (status === "cancelled") return t("statusCancelled");
   return status;
 }
 
-function orderTime(value: string): string {
+function orderTime(value: string, dateLocale: string): string {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "";
-  return new Intl.DateTimeFormat("zh-CN", {
+  return new Intl.DateTimeFormat(dateLocale, {
     timeZone: "Asia/Shanghai",
     month: "numeric",
     day: "numeric",
@@ -177,11 +179,11 @@ function orderTime(value: string): string {
   }).format(date);
 }
 
-function Meter({ label, used, limit }: { label: string; used: number; limit: number }) {
+function Meter({ label, used, limit, closed }: { label: string; used: number; limit: number; closed: string }) {
   const width = limit === 0 ? 0 : Math.min(100, Math.round((used / limit) * 100));
   return (
     <div>
-      <span>{label}<em>{limit === 0 ? "未开通" : `${used}/${limit}`}</em></span>
+      <span>{label}<em>{limit === 0 ? closed : `${used}/${limit}`}</em></span>
       <b className="track"><i style={{ width: `${width}%` }} /></b>
     </div>
   );

@@ -1,7 +1,9 @@
 import { useState } from "react";
 import { downloadFile } from "../api";
+import { useI18n } from "../i18n";
 
 export function DownloadButton({ path, name, at }: { path: string; name: string; at?: string }) {
+  const { t, tr } = useI18n();
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
 
@@ -19,8 +21,8 @@ export function DownloadButton({ path, name, at }: { path: string; name: string;
 
   return (
     <span className="download">
-      <button type="button" className="text-btn" onClick={save} disabled={pending}>{pending ? "正在下载…" : "下载"}</button>
-      {error && <span className="error">{error}</span>}
+      <button type="button" className="text-btn" onClick={save} disabled={pending}>{pending ? t("downloading") : t("download")}</button>
+      {error && <span className="error">{tr(error)}</span>}
     </span>
   );
 }

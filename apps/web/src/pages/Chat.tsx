@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { api, ApiError } from "../api";
 import { NeedLogin, useAuth } from "../auth";
+import { useI18n } from "../i18n";
 
 type Conversation = { id: string; title: string };
 type Message = { id: string; role: "user" | "assistant"; content: string };
@@ -11,6 +12,7 @@ export function Chat() {
 
 function ChatBody() {
   const { session, refresh } = useAuth();
+  const { t, tr } = useI18n();
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [current, setCurrent] = useState("");
   const [messages, setMessages] = useState<Message[]>([]);
@@ -66,7 +68,7 @@ function ChatBody() {
   return (
     <section className="chat">
       <aside>
-        <button type="button" className="btn small" onClick={() => { setCurrent(""); setMessages([]); }}>新问题</button>
+        <button type="button" className="btn small" onClick={() => { setCurrent(""); setMessages([]); }}>{t("chatNew")}</button>
         {conversations.map((item) => (
           <button key={item.id} type="button" className={item.id === current ? "talk on" : "talk"} onClick={() => open(item.id)}>
             {item.title}
@@ -74,19 +76,19 @@ function ChatBody() {
         ))}
       </aside>
       <div>
-        <p className="eyebrow">问答 · 今日 {usage?.used ?? 0} / {usage?.limit ?? 0}</p>
-        <h1>问提示词、画幅和额度。</h1>
+        <p className="eyebrow">{t("chatEyebrow", { used: usage?.used ?? 0, limit: usage?.limit ?? 0 })}</p>
+        <h1>{t("chatTitle")}</h1>
         <div className="thread">
-          {messages.length === 0 && <p className="quiet">例如：竖版电商主图，提示词要写哪些东西？</p>}
+          {messages.length === 0 && <p className="quiet">{t("chatEmpty")}</p>}
           {messages.map((item) => (
             <article key={item.id} className={item.role}>{item.content}</article>
           ))}
         </div>
         <form onSubmit={onSubmit} className="ask">
-          <input value={text} onChange={(event) => setText(event.target.value)} maxLength={500} placeholder="写一个短问题" />
-          <button className="btn" type="submit" disabled={pending}>{pending ? "…" : "发送"}</button>
+          <input value={text} onChange={(event) => setText(event.target.value)} maxLength={500} placeholder={t("chatPlaceholder")} />
+          <button className="btn" type="submit" disabled={pending}>{pending ? "…" : t("chatSend")}</button>
         </form>
-        {error && <p className="error">{error}</p>}
+        {error && <p className="error">{tr(error)}</p>}
       </div>
     </section>
   );

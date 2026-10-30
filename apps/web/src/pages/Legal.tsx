@@ -1,85 +1,79 @@
 import { Link } from "react-router-dom";
+import { useI18n } from "../i18n";
 
 export const supportEmail = "apiflowx@outlook.com";
 
 export function Privacy() {
+  const { t } = useI18n();
   return (
     <article className="legal">
-      <p className="eyebrow">绘简</p>
-      <h1>隐私政策</h1>
-      <p className="quiet">生效日期：2026年10月29日</p>
-      <p>绘简（oranook.com）提供文生图、问答和短视频。本页说明我们保存哪些信息，以及用来做什么。</p>
-
-      <h2>我们保存的信息</h2>
-      <p>注册时保存邮箱、昵称和密码的加密摘要。登录后保存会话，用来识别是哪一个账号。</p>
-      <p>作图、问答和视频时保存提示词、参数、生成状态，以及结果文件的链接。结果文件本身放在生成服务上，链接可能会过期。</p>
-      <p>开通会员时保存订单号、方案、金额和支付状态。美元订阅由 Creem 处理，早先的支付宝订单仍由支付宝处理。我们不保存银行卡号或支付密码。</p>
-      <p>我们按上海日期统计每天的图片、问答和视频次数，用来执行免费和会员额度。</p>
-
-      <h2>这些信息用来做什么</h2>
-      <p>用来创建账号、完成生成、计算额度、确认会员，以及在你来信时回复。提示词会发送给生成服务，以便返回图片、回答或视频。</p>
-
-      <h2>保存多久</h2>
-      <p>账号、作品记录和订单会一直保留，直到你要求删除。过期的生成文件可能先从生成服务上消失。登录会话到期后失效。</p>
-
-      <h2>你的选择</h2>
-      <p>可以退出登录。如果要删除账号和相关记录，请发邮件给我们，并注明注册邮箱。</p>
-      <p>联系邮箱：<a href={`mailto:${supportEmail}`}>{supportEmail}</a></p>
-      <p><Link to="/terms">使用条款</Link> · <Link to="/acceptable-use">使用规范</Link></p>
+      <p className="eyebrow">{t("brand")}</p>
+      <h1>{t("privacyTitle")}</h1>
+      <p className="quiet">{t("effective")}</p>
+      <p>{t("privacyIntro")}</p>
+      <h2>{t("privacyKeep")}</h2>
+      <p>{t("privacyKeep1")}</p>
+      <p>{t("privacyKeep2")}</p>
+      <p>{t("privacyKeep3")}</p>
+      <p>{t("privacyKeep4")}</p>
+      <h2>{t("privacyUse")}</h2>
+      <p>{t("privacyUse1")}</p>
+      <h2>{t("privacyHowLong")}</h2>
+      <p>{t("privacyHowLong1")}</p>
+      <h2>{t("privacyChoice")}</h2>
+      <p>{t("privacyChoice1")}</p>
+      <p>{t("contact")}<a href={`mailto:${supportEmail}`}>{supportEmail}</a></p>
+      <p><Link to="/terms">{t("terms")}</Link> · <Link to="/acceptable-use">{t("acceptable")}</Link></p>
     </article>
   );
 }
 
 export function Terms() {
+  const { t, locale } = useI18n();
+  const stop = locale === "zh" ? "。" : ".";
   return (
     <article className="legal">
-      <p className="eyebrow">绘简</p>
-      <h1>使用条款</h1>
-      <p className="quiet">生效日期：2026年10月29日</p>
-      <p>使用绘简（oranook.com）即表示你同意这些条款。服务包括文生图、问答，以及会员可用的短视频。</p>
-
-      <h2>账号</h2>
-      <p>请使用真实可达的邮箱注册，并保管自己的密码。一个账号的额度和会员只供该账号使用。</p>
-
-      <h2>可以做什么，不可以做什么</h2>
-      <p>可以用绘简为自己的商品、作业和创作准备画面。禁止生成或传播侵权、违法、欺诈或侵害他人的内容，也禁止色情、露骨、性暗示内容，以及针对未成年人的性内容。暴力伤害、诈骗、深度伪造和换脸同样禁止。我们会拒绝这类请求，并可以暂停相关账号。具体边界见<Link to="/acceptable-use">使用规范</Link>。</p>
-      <p>生成结果由你自行判断能否使用。绘简不保证画面里的文字、商标或人物可以商用。</p>
-
-      <h2>会员和付款</h2>
-      <p>价格、天数和每天额度以会员页当时显示的为准。国内和国际都按美元计价：限时会员前 6 个月每月 2.99 美元，之后每月 4.99 美元；月费会员每月 4.99 美元。用银行卡按月订阅。我们确认支付成功后开通会员，之后每期续费自动延长。取消订阅后，当前这期结束就不再续费。早先用支付宝付的订单仍按当时的人民币金额。免费方案在会员到期或额度用尽后继续可用。</p>
-      <p>生成服务繁忙时，任务可能失败。失败的一次不计入已用额度。</p>
-
-      <h2>服务变更</h2>
-      <p>我们可能调整模型、额度和页面。已经支付的会员会保留到原定到期日，额度以开通时会员页所示为准。</p>
-
-      <h2>联系</h2>
-      <p>问题、退款和账号删除请发邮件到 <a href={`mailto:${supportEmail}`}>{supportEmail}</a>。</p>
-      <p><Link to="/privacy">隐私政策</Link> · <Link to="/acceptable-use">使用规范</Link></p>
+      <p className="eyebrow">{t("brand")}</p>
+      <h1>{t("termsTitle")}</h1>
+      <p className="quiet">{t("effective")}</p>
+      <p>{t("termsIntro")}</p>
+      <h2>{t("termsAccount")}</h2>
+      <p>{t("termsAccount1")}</p>
+      <h2>{t("termsAllowed")}</h2>
+      <p>{t("termsAllowed1")}<Link to="/acceptable-use">{t("acceptable")}</Link>{stop}</p>
+      <p>{t("termsAllowed2")}</p>
+      <h2>{t("termsPay")}</h2>
+      <p>{t("termsPay1")}</p>
+      <p>{t("termsPay2")}</p>
+      <h2>{t("termsChange")}</h2>
+      <p>{t("termsChange1")}</p>
+      <h2>{t("termsContact")}</h2>
+      <p>{t("termsContact1")} <a href={`mailto:${supportEmail}`}>{supportEmail}</a>{stop}</p>
+      <p><Link to="/privacy">{t("privacy")}</Link> · <Link to="/acceptable-use">{t("acceptable")}</Link></p>
     </article>
   );
 }
 
 export function AcceptableUse() {
+  const { t, locale } = useI18n();
+  const stop = locale === "zh" ? "。" : ".";
   return (
     <article className="legal">
-      <p className="eyebrow">绘简</p>
-      <h1>使用规范</h1>
-      <p className="quiet">生效日期：2026年10月29日</p>
-      <p>绘简（oranook.com）只用于为自己的商品、作业和创作准备画面、问答和短视频。使用本服务即表示你遵守本规范。</p>
-
-      <h2>禁止的内容</h2>
-      <p>不要提交、生成或传播以下内容：</p>
-      <p>色情、露骨、性暗示，以及任何针对未成年人的性内容。</p>
-      <p>侵权、冒充他人、欺诈、诈骗，以及侵害他人隐私或名誉的内容。</p>
-      <p>违法内容，包括暴力伤害、仇恨、危险行为教学。</p>
-      <p>深度伪造、换脸，以及把真实的人做成误导性画面或视频。</p>
-
-      <h2>我们会怎么处理</h2>
-      <p>这类请求会被拒绝，不生成结果。反复尝试或传播禁止内容的账号可以被暂停。已经生成的记录也可以删除。</p>
-
-      <h2>联系</h2>
-      <p>发现违规内容，或需要说明一次被拒绝的请求，请发邮件到 <a href={`mailto:${supportEmail}`}>{supportEmail}</a>。</p>
-      <p><Link to="/terms">使用条款</Link> · <Link to="/privacy">隐私政策</Link></p>
+      <p className="eyebrow">{t("brand")}</p>
+      <h1>{t("useTitle")}</h1>
+      <p className="quiet">{t("effective")}</p>
+      <p>{t("useIntro")}</p>
+      <h2>{t("useBanned")}</h2>
+      <p>{t("useBannedLead")}</p>
+      <p>{t("useBanned1")}</p>
+      <p>{t("useBanned2")}</p>
+      <p>{t("useBanned3")}</p>
+      <p>{t("useBanned4")}</p>
+      <h2>{t("useHandle")}</h2>
+      <p>{t("useHandle1")}</p>
+      <h2>{t("termsContact")}</h2>
+      <p>{t("useContact1")} <a href={`mailto:${supportEmail}`}>{supportEmail}</a>{stop}</p>
+      <p><Link to="/terms">{t("terms")}</Link> · <Link to="/privacy">{t("privacy")}</Link></p>
     </article>
   );
 }

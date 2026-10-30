@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { api, type VideoItem } from "../api";
 import { DownloadButton } from "../components/DownloadButton";
 import { NeedLogin, useAuth } from "../auth";
+import { useI18n } from "../i18n";
 
 const ratios = ["16:9", "9:16", "1:1", "3:4", "4:3"];
 
@@ -11,7 +12,8 @@ export function VideoPage() {
 
 function VideoBody() {
   const { session, refresh } = useAuth();
-  const [prompt, setPrompt] = useState("镜头缓缓推近白瓷杯，窗光轻轻移动，桌布几乎不动");
+  const { t, tr } = useI18n();
+  const [prompt, setPrompt] = useState(t("videoPrompt"));
   const [aspectRatio, setAspectRatio] = useState("1:1");
   const [seconds, setSeconds] = useState("5");
   const [firstFrame, setFirstFrame] = useState("");
@@ -82,8 +84,8 @@ function VideoBody() {
   return (
     <section className="studio">
       <div className="composer">
-        <p className="eyebrow">视频</p>
-        <h1>用一句话出一段短片。</h1>
+        <p className="eyebrow">{t("videoEyebrow")}</p>
+        <h1>{t("videoTitle")}</h1>
         <textarea value={prompt} onChange={(event) => setPrompt(event.target.value)} rows={5} maxLength={800} />
         <div className="choices">
           {ratios.map((value) => (
@@ -92,30 +94,37 @@ function VideoBody() {
         </div>
         <div className="choices">
           {["4", "5", "6", "8"].map((value) => (
-            <button key={value} type="button" className={seconds === value ? "chip on" : "chip"} onClick={() => setSeconds(value)}>{value} 秒</button>
+            <button key={value} type="button" className={seconds === value ? "chip on" : "chip"} onClick={() => setSeconds(value)}>{t("videoSeconds", { value })}</button>
           ))}
         </div>
-        <label>首帧图片地址，可留空
+        <label>{t("videoFrame")}
           <input value={firstFrame} onChange={(event) => setFirstFrame(event.target.value)} placeholder="https://" />
         </label>
         <div className="row">
-          <button className="btn" type="button" onClick={generate} disabled={pending || videoLocked}>{pending ? "提交中…" : "生成视频"}</button>
-          <span className="quiet">{videoLocked ? "免费方案不能出视频，开通会员后每天 10 段。" : `今日 ${usage?.used ?? 0} / ${usage?.limit ?? 0}`}</span>
+          <button className="btn" type="button" onClick={generate} disabled={pending || videoLocked}>{pending ? t("videoSubmitting") : t("videoGenerate")}</button>
+          <span className="quiet">{videoLocked ? t("videoLocked") : t("videoToday", { used: usage?.used ?? 0, limit: usage?.limit ?? 0 })}</span>
         </div>
-        {error && <p className="error">{error}</p>}
+        {error && <p className="error">{tr(error)}</p>}
       </div>
       <div className="stage">
         {current?.url && <video src={current.url} controls />}
         {current?.url && <DownloadButton path={`/api/videos/${current.id}/file`} name="huijian-video" at={current.created_at} />}
-        {!current?.url && <div className="empty">{current?.status === "processing" ? "视频还在生成，每两秒看一次。" : current?.error || "视频会停在这里。"}</div>}
+        {!current?.url && <div className="empty">{current?.status === "processing" ? t("videoProcessing") : tr(current?.error || "") || t("videoEmpty")}</div>}
         <ul className="plain">
           {videos.map((item) => (
             <li key={item.id}>
-              <button type="button" className="text-btn" onClick={() => setCurrent(item)}>{item.prompt.slice(0, 24)} · {item.status}</button>
+              <button type="button" className="text-btn" onClick={() => setCurrent(item)}>{item.prompt.slice(0, 24)} · {statusLabel(item.status, t)}</button>
             </li>
           ))}
         </ul>
       </div>
     </section>
   );
+}
+
+function statusLabel(status: string, t: ReturnType<typeof useI18n>["t"]): string {
+  if (status === "completed") return t("statusCompleted");
+  if (status === "failed") return t("statusFailed");
+  if (status === "processing") return t("statusProcessing");
+  return status;
 }
