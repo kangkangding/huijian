@@ -210,7 +210,7 @@ const zh = {
 } as const;
 
 const en: { [K in keyof typeof zh]: string } = {
-  brand: "绘简",
+  brand: "Huijian",
   title: "Huijian · One sentence, one picture",
   description: "Text-to-image for shops, students, and hobbyists. Ask how to write a prompt, and members can make a short video.",
   langLabel: "Language",
